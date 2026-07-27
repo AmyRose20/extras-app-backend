@@ -1,0 +1,118 @@
+// Prisma schema for the Extras App
+// Run `npx prisma migrate dev --name init` after setting DATABASE_URL in .env
+// to create these tables in your local PostgreSQL database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN // casting coordinator
+  EXTRA
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         Role
+  name         String
+  phone        String?
+  createdAt    DateTime @default(now())
+
+  // Only populated when role == EXTRA
+  extraProfile ExtraProfile?
+
+  // Only populated when role == ADMIN
+  shootDaysCreated ShootDay[]
+
+  @@map("users")
+}
+
+model ExtraProfile {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  age          Int?
+  gender       Gender?
+  heightCm     Int?
+  skills       String[] // e.g. ["stunt work", "horse riding", "sign language"]
+  availability String?  // free-text for now; can become a proper calendar later
+  photoUrl     String?
+
+  invites      CallInvite[]
+
+  @@map("extra_profiles")
+}
+
+model ShootDay {
+  id              String   @id @default(uuid())
+  productionName  String
+  date            DateTime
+  location        String
+  createdById     String
+  createdBy       User     @relation(fields: [createdById], references: [id])
+  createdAt       DateTime @default(now())
+
+  callRequests    CallRequest[]
+
+  @@map("shoot_days")
+}
+
+model CallRequest {
+  id             String   @id @default(uuid())
+  shootDayId     String
+  shootDay       ShootDay @relation(fields: [shootDayId], references: [id], onDelete: Cascade)
+
+  description    String   // e.g. "20 men, fight scene"
+  quantityNeeded Int
+
+  // Matching criteria — kept flexible as JSON so we can add filters
+  // without a migration every time, e.g.:
+  // { "minAge": 25, "maxAge": 45, "gender": "MALE", "skills": ["stunt work"] }
+  criteria       Json
+
+  createdAt      DateTime @default(now())
+
+  invites        CallInvite[]
+
+  @@map("call_requests")
+}
+
+model CallInvite {
+  id            String       @id @default(uuid())
+  callRequestId String
+  callRequest   CallRequest  @relation(fields: [callRequestId], references: [id], onDelete: Cascade)
+
+  extraProfileId String
+  extraProfile   ExtraProfile @relation(fields: [extraProfileId], references: [id], onDelete: Cascade)
+
+  status        InviteStatus @default(PENDING)
+  sentAt        DateTime     @default(now())
+  respondedAt   DateTime?
+
+  // One extra should only be invited once per call request
+  @@unique([callRequestId, extraProfileId])
+  @@map("call_invites")
+}
