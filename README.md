@@ -71,14 +71,14 @@ See `prisma/schema.prisma` for the full schema.
 
 ## Roadmap
 
-- [x] Week 1 — Backend foundation: schema, migrations, health check
-- [x] Week 2 — Auth: register/login, JWT, role middleware
-- [x] Week 3 — Core API: profiles, call requests, matching logic
-- [ ] Week 4 — React Native scaffolding, wired to this API
-- [ ] Week 5 — Extra-side UI: profile + invite list
-- [ ] Week 6 — Coordinator UI + Firebase push notifications
-- [ ] Week 7 — Live accept/decline dashboard, edge cases
-- [ ] Week 8 — Polish, seed data, deploy, demo GIF
+- [x] Part 1 — Backend foundation: schema, migrations, health check
+- [x] Part 2 — Auth: register/login, JWT, role middleware
+- [x] Part 3 — Core API: profiles, call requests, matching logic
+- [ ] Part 4 — React Native scaffolding, wired to this API
+- [ ] Part 5 — Extra-side UI: profile + invite list
+- [ ] Part 6 — Coordinator UI + Firebase push notifications
+- [ ] Part 7 — Live accept/decline dashboard, edge cases
+- [ ] Part 8 — Polish, seed data, deploy, demo GIF
 
 ## License
 
