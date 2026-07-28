@@ -83,3 +83,15 @@ See `prisma/schema.prisma` for the full schema.
 ## License
 
 MIT
+
+## Stretch goals
+
+- **Admin-created profiles for extras without smartphones** — some extras (e.g. older
+  participants without a smartphone) can't self-register or use the app. A coordinator
+  could create a profile on their behalf (name, phone, age, skills) so they're still
+  included in matching.
+- **SMS fallback** — for profiles without app access, send an SMS (via Twilio) instead
+  of a push notification when matched, with a simple YES/NO reply to accept/decline.
+- **Manual invite status** — allow an admin to manually mark an invite as
+  accepted/declined on someone's behalf, for cases where they were contacted by phone
+  the traditional way.
