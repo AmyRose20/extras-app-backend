@@ -24,4 +24,20 @@ async function updateMyProfile(req, res) {
   return res.json(updated);
 }
 
-module.exports = { getMyProfile, updateMyProfile };
+// PATCH /profiles/me/fcm-token — an EXTRA's device registering its push token
+async function updateFcmToken(req, res) {
+  const { fcmToken } = req.body;
+
+  if (!fcmToken) {
+    return res.status(400).json({ error: 'fcmToken is required' });
+  }
+
+  const updated = await prisma.extraProfile.update({
+    where: { userId: req.user.userId },
+    data: { fcmToken },
+  });
+
+  return res.json(updated);
+}
+
+module.exports = { getMyProfile, updateMyProfile, updateFcmToken };

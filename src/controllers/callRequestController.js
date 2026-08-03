@@ -1,4 +1,6 @@
 const prisma = require('../config/db');
+require('../config/firebase'); // initializes the Firebase app
+const { getMessaging } = require('firebase-admin/messaging');
 
 // POST /call-requests — ADMIN creates a call for a shoot day and the
 // matching extras are found and invited automatically.
@@ -37,7 +39,7 @@ async function createCallRequest(req, res) {
 
       // Sending the actual push notifications happens here in a later step
       // (Week 6) via Firebase Cloud Messaging — this is the hook point.
-      // await sendPushNotifications(matchedExtras, callRequest);
+      await sendPushNotifications(matchedExtras, callRequest);
     }
 
     return res.status(201).json({
@@ -47,6 +49,35 @@ async function createCallRequest(req, res) {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Something went wrong creating the call request' });
+  }
+}
+
+// Sends a push notification to each matched extra who has a saved FCM token.
+// Extras without a token yet (haven't opened the app, denied permission, etc.)
+// are just skipped — no error, since this is expected for some users.
+async function sendPushNotifications(matchedExtras, callRequest) {
+  const tokens = matchedExtras
+    .map((extra) => extra.fcmToken)
+    .filter((token) => token != null && token !== '');
+
+  if (tokens.length === 0) {
+    console.log('No FCM tokens to send to for this call request');
+    return;
+  }
+
+  const message = {
+    notification: {
+      title: 'New Call Request',
+      body: callRequest.description,
+    },
+    tokens,
+  };
+
+  try {
+    const response = await getMessaging().sendEachForMulticast(message);
+    console.log(`Push sent: ${response.successCount} succeeded, ${response.failureCount} failed`);
+  } catch (error) {
+    console.error('Error sending push notifications:', error);
   }
 }
 
