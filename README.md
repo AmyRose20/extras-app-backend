@@ -18,7 +18,7 @@ based on firsthand experience working as a film extra.
 
 ## Status
 
-🚧 Week 1 of 8 — backend schema and core API scaffolded.
+🚧  Week 8 of 8 — Parts 1-7 complete, working on final polish, seed data, and demo materials.
 
 ## Getting started
 
@@ -74,10 +74,10 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 1 — Backend foundation: schema, migrations, health check
 - [x] Part 2 — Auth: register/login, JWT, role middleware
 - [x] Part 3 — Core API: profiles, call requests, matching logic
-- [ ] Part 4 — React Native scaffolding, wired to this API
-- [ ] Part 5 — Extra-side UI: profile + invite list
-- [ ] Part 6 — Coordinator UI + Firebase push notifications
-- [ ] Part 7 — Live accept/decline dashboard, edge cases
+- [x] Part 4 — React Native scaffolding, wired to this API
+- [x] Part 5 — Extra-side UI: profile + invite list
+- [x] Part 6 — Coordinator UI + Firebase push notifications
+- [x] Part 7 — Live accept/decline dashboard, edge cases
 - [ ] Part 8 — Polish, seed data, deploy, demo GIF
 
 ## License
