@@ -16,7 +16,12 @@ async function getMyInvites(req, res) {
     orderBy: { sentAt: 'desc' },
   });
 
-  return res.json(invites);
+  const invitesWithExpiry = invites.map((invite) => ({
+    ...invite,
+    isExpired: invite.status === 'PENDING' && new Date(invite.callRequest.shootDay.date) < new Date(),
+  }));
+
+  return res.json(invitesWithExpiry);
 }
 
 // PATCH /invites/:id — an EXTRA accepts or declines an invite
@@ -33,9 +38,20 @@ async function respondToInvite(req, res) {
     where: { userId: req.user.userId },
   });
 
-  const invite = await prisma.callInvite.findUnique({ where: { id } });
+  const invite = await prisma.callInvite.findUnique({
+    where: { id },
+    include: { callRequest: { include: { shootDay: true } } },
+  });
   if (!invite || invite.extraProfileId !== profile.id) {
     return res.status(404).json({ error: 'Invite not found' });
+  }
+
+  if (new Date(invite.callRequest.shootDay.date) < new Date()) {
+    return res.status(400).json({ error: 'This invite has expired — the shoot day has already passed' });
+  }
+
+  if (invite.status !== 'PENDING') {
+    return res.status(400).json({ error: `This invite has already been ${invite.status.toLowerCase()}` });
   }
 
   const updated = await prisma.callInvite.update({
@@ -47,3 +63,5 @@ async function respondToInvite(req, res) {
 }
 
 module.exports = { getMyInvites, respondToInvite };
+
+

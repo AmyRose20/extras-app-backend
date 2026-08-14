@@ -45,6 +45,7 @@ async function createCallRequest(req, res) {
     return res.status(201).json({
       callRequest,
       matchedCount: matchedExtras.length,
+      warning: matchedExtras.length === 0 ? 'No extras matched this criteria — try widening the age range, gender, or skills.' : undefined,
     });
   } catch (err) {
     console.error(err);

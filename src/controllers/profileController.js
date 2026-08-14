@@ -32,6 +32,15 @@ async function updateFcmToken(req, res) {
     return res.status(400).json({ error: 'fcmToken is required' });
   }
 
+  const profile = await prisma.extraProfile.findUnique({
+    where: { userId: req.user.userId },
+  });
+
+  if (!profile) {
+    // Admins/coordinators don't have an ExtraProfile — nothing to save the token to.
+    return res.status(404).json({ error: 'No extra profile found for this user' });
+  }
+
   const updated = await prisma.extraProfile.update({
     where: { userId: req.user.userId },
     data: { fcmToken },
