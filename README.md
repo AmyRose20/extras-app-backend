@@ -20,6 +20,20 @@ based on firsthand experience working as a film extra.
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 
+## Screenshots
+
+| Login | Home (Extra) | Home (Admin) |
+|---|---|---|
+| ![Login Screen](screenshots/Login%20Screen.png) | ![Home Screen - Extra](screenshots/Home%20Screen%20-%20extra.png) | ![Home Screen - Admin](screenshots/Home%20Screen%20-%20admin.png) |
+
+| My Invites | Create Call Request (matched) | Create Call Request (no matches) |
+|---|---|---|
+| ![My Invites](screenshots/My%20Invites.png) | ![Matches and tally](screenshots/Create%20call%20request%20-%20matches%20and%20tally%20screen.png) | ![No matches](screenshots/Create%20call%20request%20-%20no%20matches.png) |
+
+| Push Notification |
+|---|
+| ![Push notification](screenshots/call%20request%20notification%20-%20extra.png) |
+
 🔜 Phase 2 (not started) — polished UI/UX pass. Phase 1 intentionally prioritized
 functionality over visual design; screens are currently plain/unstyled React Native defaults.
 
