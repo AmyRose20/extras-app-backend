@@ -17,8 +17,11 @@ based on firsthand experience working as a film extra.
 - **Push notifications:** Firebase Cloud Messaging
 
 ## Status
+✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
+push notifications, live status dashboard, edge case handling, seed data).
 
-🚧  Week 8 of 8 — Parts 1-7 complete, working on final polish, seed data, and demo materials.
+🔜 Phase 2 (not started) — polished UI/UX pass. Phase 1 intentionally prioritized
+functionality over visual design; screens are currently plain/unstyled React Native defaults.
 
 ## Getting started
 
@@ -69,7 +72,7 @@ based on firsthand experience working as a film extra.
 
 See `prisma/schema.prisma` for the full schema.
 
-## Roadmap
+## Roadmap — Phase 1 (functionality)
 
 - [x] Part 1 — Backend foundation: schema, migrations, health check
 - [x] Part 2 — Auth: register/login, JWT, role middleware
@@ -78,7 +81,20 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 5 — Extra-side UI: profile + invite list
 - [x] Part 6 — Coordinator UI + Firebase push notifications
 - [x] Part 7 — Live accept/decline dashboard, edge cases
-- [ ] Part 8 — Polish, seed data, deploy, demo GIF
+- [x] Part 8 — Polish, seed data, deploy, demo GIF
+
+## Screenshots
+
+| Login | My Invites | Push Notification |
+|---|---|---|
+| ![Login](screenshots/login.png) | ![Invites](screenshots/invites.png) | ![Push](screenshots/push.png) |
+
+| Create Call Request (matched) | Call Status Dashboard |
+|---|---|
+| ![Create](screenshots/create-call-request.png) | ![Status](screenshots/status.png) |
+
+**Phase 2 (planned):** polished UI/UX — custom styling, animations, proper design system.
+Not yet started; Phase 1 focused entirely on getting every feature working correctly first.
 
 ## License
 
