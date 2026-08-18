@@ -97,16 +97,6 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 7 — Live accept/decline dashboard, edge cases
 - [x] Part 8 — Polish, seed data, deploy, demo GIF
 
-## Screenshots
-
-| Login | My Invites | Push Notification |
-|---|---|---|
-| ![Login](screenshots/login.png) | ![Invites](screenshots/invites.png) | ![Push](screenshots/push.png) |
-
-| Create Call Request (matched) | Call Status Dashboard |
-|---|---|
-| ![Create](screenshots/create-call-request.png) | ![Status](screenshots/status.png) |
-
 **Phase 2 (planned):** polished UI/UX — custom styling, animations, proper design system.
 Not yet started; Phase 1 focused entirely on getting every feature working correctly first.
 
