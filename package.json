@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "API for organizing and notifying film extras for shoot days",
   "main": "src/index.js",
-  "scripts": {
+    "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "migrate": "prisma migrate dev",
@@ -22,5 +22,7 @@
   "devDependencies": {
     "nodemon": "^3.1.4",
     "prisma": "^5.18.0"
+  }, "prisma": {
+    "seed": "node prisma/seed.js"
   }
 }
