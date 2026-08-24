@@ -15,6 +15,8 @@ based on firsthand experience working as a film extra.
 - **Database:** PostgreSQL
 - **Mobile app:** React Native (separate repo/folder — see roadmap below)
 - **Push notifications:** Firebase Cloud Messaging
+- **Photo storage:** Firebase Storage — uploaded directly from the mobile app, secured
+  per-user via a Firebase custom auth token issued by the backend at login
 
 ## Status
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
@@ -34,8 +36,10 @@ push notifications, live status dashboard, edge case handling, seed data).
 |---|
 | ![Push notification](screenshots/call%20request%20notification%20-%20extra.png) |
 
-🔜 Phase 2 (not started) — polished UI/UX pass. Phase 1 intentionally prioritized
-functionality over visual design; screens are currently plain/unstyled React Native defaults.
+🔄 Phase 2 in progress — polished UI/UX pass + new features, tackled part-by-part.
+Part 1 (extra profile edit + mandatory face/full-body photo upload, secured via
+Firebase Storage) is functionally complete and tested; visual styling for this
+screen is next.
 
 ## Getting started
 
@@ -68,7 +72,7 @@ functionality over visual design; screens are currently plain/unstyled React Nat
 | POST   | `/auth/register`       | Any   | Create an account (ADMIN or EXTRA)        |
 | POST   | `/auth/login`          | Any   | Log in, get a JWT                         |
 | GET    | `/profiles/me`         | Extra | View your own profile                     |
-| PATCH  | `/profiles/me`         | Extra | Update your own profile                   |
+| PATCH  | `/profiles/me`         | Extra | Update your own profile, including face/full-body photo     |
 | POST   | `/call-requests`       | Admin | Create a call, auto-matches eligible extras |
 | GET    | `/call-requests/:id`   | Admin | See invite status + accept/decline tally  |
 | GET    | `/invites/me`          | Extra | View your invites                         |
@@ -96,6 +100,33 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 6 — Coordinator UI + Firebase push notifications
 - [x] Part 7 — Live accept/decline dashboard, edge cases
 - [x] Part 8 — Polish, seed data, deploy, demo GIF
+
+## Roadmap — Phase 2 (UI polish + new features)
+- [ ] Part 1 — Extra profile edit + mandatory face/full-body photo upload (Firebase
+      Storage, secured with per-user rules backed by a Firebase custom auth token)
+  - [x] Functionality
+  - [ ] UI polish
+- [ ] Part 2 — Admin: view extra profiles
+  - [ ] Functionality
+  - [ ] UI polish
+- [ ] Part 3 — Cancel/decline distinction + lifetime tally view (both sides)
+  - [ ] Functionality
+  - [ ] UI polish
+- [ ] Part 4 — Edit shoot day / call request
+  - [ ] Functionality
+  - [ ] UI polish
+- [ ] Part 5 — Bulk shoot day creation
+  - [ ] Functionality
+  - [ ] UI polish
+- [ ] Part 6 — Calendar views (both sides)
+  - [ ] Functionality
+  - [ ] UI polish
+- [ ] Part 7 — Profile deletion request/approval flow
+  - [ ] Functionality
+  - [ ] UI polish
+- [ ] Part 8 — Login page visual
+  - [ ] Functionality
+  - [ ] UI polish
 
 **Phase 2 (planned):** polished UI/UX — custom styling, animations, proper design system.
 Not yet started; Phase 1 focused entirely on getting every feature working correctly first.
