@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
+const { getAuth } = require('firebase-admin/auth');
+const firebaseApp = require('../config/firebase');
 
 const SALT_ROUNDS = 10;
 
@@ -60,7 +62,9 @@ async function login(req, res) {
     }
 
     const token = signToken(user);
-    return res.json({ token, user: toPublicUser(user) });
+    const firebaseToken = await getAuth(firebaseApp).createCustomToken(user.id);
+
+    return res.json({ token, firebaseToken, user: toPublicUser(user) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Something went wrong logging in' });

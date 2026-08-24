@@ -59,7 +59,8 @@ model ExtraProfile {
   heightCm     Int?
   skills       String[] // e.g. ["stunt work", "horse riding", "sign language"]
   availability String?  // free-text for now; can become a proper calendar later
-  photoUrl     String?
+  facePhotoUrl     String?
+  fullBodyPhotoUrl String?
   fcmToken     String?
 
   invites      CallInvite[]

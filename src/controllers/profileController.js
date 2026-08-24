@@ -14,11 +14,11 @@ async function getMyProfile(req, res) {
 
 // PATCH /profiles/me — an EXTRA updating their own profile
 async function updateMyProfile(req, res) {
-  const { age, gender, heightCm, skills, availability, photoUrl } = req.body;
+  const { age, gender, heightCm, skills, availability, facePhotoUrl, fullBodyPhotoUrl } = req.body;
 
   const updated = await prisma.extraProfile.update({
     where: { userId: req.user.userId },
-    data: { age, gender, heightCm, skills, availability, photoUrl },
+    data: { age, gender, heightCm, skills, availability, facePhotoUrl, fullBodyPhotoUrl },
   });
 
   return res.json(updated);
