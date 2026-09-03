@@ -58,6 +58,9 @@ model ExtraProfile {
   gender       Gender?
   heightCm     Int?
   skills       String[] // e.g. ["stunt work", "horse riding", "sign language"]
+  languages    String[] // e.g. ["English", "Irish", "French"]
+  phoneNumber   String?
+  contactEmail  String?
   availability String?  // free-text for now; can become a proper calendar later
   facePhotoUrl     String?
   fullBodyPhotoUrl String?
