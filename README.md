@@ -38,8 +38,9 @@ push notifications, live status dashboard, edge case handling, seed data).
 
 🔄 Phase 2 in progress — polished UI/UX pass + new features, tackled part-by-part.
 Part 1 (extra profile edit + mandatory face/full-body photo upload, secured via
-Firebase Storage) is functionally complete and tested; visual styling for this
-screen is next.
+Firebase Storage) is complete, including visual styling — chip-based skill/language
+selection, a restricted gender dropdown, a boxed card layout, and contact info fields.
+Part 2 is next.
 
 ## Getting started
 
@@ -81,7 +82,8 @@ screen is next.
 ## Data model
 
 - `users` — accounts, either ADMIN (coordinator) or EXTRA
-- `extra_profiles` — age, gender, height, skills, availability, photo
+- `extra_profiles` — age, gender, height, skills, languages, phone/contact email,
+  availability, photo
 - `shoot_days` — a production's shoot day (date, location)
 - `call_requests` — a need for a shoot day, with matching criteria (age
   range, gender, skills) and quantity needed
@@ -102,10 +104,10 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 8 — Polish, seed data, deploy, demo GIF
 
 ## Roadmap — Phase 2 (UI polish + new features)
-- [ ] Part 1 — Extra profile edit + mandatory face/full-body photo upload (Firebase
+- [x] Part 1 — Extra profile edit + mandatory face/full-body photo upload (Firebase
       Storage, secured with per-user rules backed by a Firebase custom auth token)
   - [x] Functionality
-  - [ ] UI polish
+  - [x] UI polish
 - [ ] Part 2 — Admin: view extra profiles
   - [ ] Functionality
   - [ ] UI polish
@@ -127,9 +129,6 @@ See `prisma/schema.prisma` for the full schema.
 - [ ] Part 8 — Login page visual
   - [ ] Functionality
   - [ ] UI polish
-
-**Phase 2 (planned):** polished UI/UX — custom styling, animations, proper design system.
-Not yet started; Phase 1 focused entirely on getting every feature working correctly first.
 
 ## License
 
