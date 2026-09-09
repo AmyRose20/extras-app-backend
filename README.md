@@ -42,7 +42,9 @@ Firebase Storage) is complete, including visual styling — chip-based skill/lan
 selection, a restricted gender dropdown, a boxed card layout, and contact info fields.
 Part 2 (admin: view and filter extra profiles) is also complete, including filtering
 by skill, gender, availability, and age range (with a filter-type dropdown and a
-clear-filters option), and a full profile detail view for admins. Part 3 is next.
+clear-filters option), and a full profile detail view for admins.
+Part 3 (cancel/decline distinction, lifetime worked/declined/cancelled tally, and a 3-strikes cancellation flag
+for admins) is also complete. Part 4 is next.
 
 ## Getting started
 
@@ -79,9 +81,9 @@ clear-filters option), and a full profile detail view for admins. Part 3 is next
 | POST   | `/call-requests`       | Admin | Create a call, auto-matches eligible extras |
 | GET    | `/call-requests/:id`   | Admin | See invite status + accept/decline tally  |
 | GET    | `/invites/me`          | Extra | View your invites                         |
-| PATCH  | `/invites/:id`         | Extra | Accept or decline an invite               |
-| GET    | `/profiles`            | Admin | View all extra profiles, with filtering (skill, gender, availability, age) |
-| GET    | `/profiles/:id`        | Admin | View full detail of a single extra profile |
+| PATCH  | `/invites/:id`         | Extra | Accept, decline, or cancel (after accepting) an invite |
+| GET    | `/invites/tally/me`    | Extra | View your own lifetime worked/declined/cancelled tally |
+| GET    | `/invites/tally/:extraProfileId` | Admin | View any extra's lifetime tally + 3-strikes flag |
 
 ## Data model
 
@@ -92,7 +94,7 @@ clear-filters option), and a full profile detail view for admins. Part 3 is next
 - `call_requests` — a need for a shoot day, with matching criteria (age
   range, gender, skills) and quantity needed
 - `call_invites` — the link between a call request and a matched extra,
-  tracking accepted/declined/pending status
+  tracking pending/accepted/declined/cancelled/expired status
 
 See `prisma/schema.prisma` for the full schema.
 
@@ -115,9 +117,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 2 — Admin: view extra profiles
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 3 — Cancel/decline distinction + lifetime tally view (both sides)
-  - [ ] Functionality
-  - [ ] UI polish
+- [x] Part 3 — Cancel/decline distinction + lifetime tally view (both sides)
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 4 — Edit shoot day / call request
   - [ ] Functionality
   - [ ] UI polish
