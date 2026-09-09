@@ -19,12 +19,12 @@ async function main() {
   });
 
   // ----- Extras -----
-  const extrasData = [
-    { email: 'extra1@example.com', name: 'Jordan Lee', age: 29, gender: 'FEMALE', heightCm: 171, skills: ['Stunt work', 'horse back riding', 'rowing'], availability: 'Every day' },
-    { email: 'extra2@example.com', name: 'Sam Rivera', age: 34, gender: 'MALE', heightCm: 180, skills: ['sign language', 'martial arts'], availability: 'Weekdays' },
-    { email: 'extra3@example.com', name: 'Priya Nair', age: 22, gender: 'FEMALE', heightCm: 165, skills: ['dancing'], availability: 'Weekends' },
-    { email: 'extra4@example.com', name: 'Chris Okafor', age: 41, gender: 'MALE', heightCm: 175, skills: ['Stunt work', 'boxing'], availability: 'Every day' },
-    { email: 'extra5@example.com', name: 'Taylor Kim', age: 27, gender: 'NON_BINARY', heightCm: 168, skills: ['singing', 'sign language'], availability: 'Weekdays' },
+    const extrasData = [
+  { email: 'extra1@example.com', name: 'Jordan Lee', age: 29, gender: 'FEMALE', heightCm: 171, skills: ['Stunt work', 'horse back riding', 'rowing'], availability: ['Everyday'] },
+    { email: 'extra2@example.com', name: 'Sam Rivera', age: 34, gender: 'MALE', heightCm: 180, skills: ['sign language', 'martial arts'], availability: ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays'] },
+    { email: 'extra3@example.com', name: 'Priya Nair', age: 22, gender: 'FEMALE', heightCm: 165, skills: ['dancing'], availability: ['Tuesdays', 'Thursdays'] },
+    { email: 'extra4@example.com', name: 'Chris Okafor', age: 41, gender: 'MALE', heightCm: 175, skills: ['Stunt work', 'boxing'], availability: ['Everyday'] },
+    { email: 'extra5@example.com', name: 'Taylor Kim', age: 27, gender: 'NON_BINARY', heightCm: 168, skills: ['singing', 'sign language'], availability: ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays'] },
   ];
 
   const extras = [];

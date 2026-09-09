@@ -61,7 +61,7 @@ model ExtraProfile {
   languages    String[] // e.g. ["English", "Irish", "French"]
   phoneNumber   String?
   contactEmail  String?
-  availability String?  // free-text for now; can become a proper calendar later
+  availability String[] // e.g. ["Everyday"] or ["Mondays", "Wednesdays", "Fridays"]
   facePhotoUrl     String?
   fullBodyPhotoUrl String?
   fcmToken     String?

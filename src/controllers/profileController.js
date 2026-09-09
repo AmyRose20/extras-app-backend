@@ -49,4 +49,63 @@ async function updateFcmToken(req, res) {
   return res.json(updated);
 }
 
-module.exports = { getMyProfile, updateMyProfile, updateFcmToken };
+// GET /profiles — an ADMIN listing all extras (optionally filtered by skill)
+async function listProfiles(req, res) {
+  const { skill, gender, minAge, maxAge, availability } = req.query;
+
+  const where = {};
+
+  if (skill) {
+    const skillList = skill.split(',').map((s) => s.trim()).filter(Boolean);
+    where.skills = { hasSome: skillList };
+  }
+
+  if (gender) {
+    where.gender = gender;
+  }
+
+  if (availability) {
+    const availabilityList = availability.split(',').map((a) => a.trim()).filter(Boolean);
+    where.availability = { hasSome: availabilityList };
+  }
+
+  if (minAge || maxAge) {
+    where.age = {};
+    if (minAge) where.age.gte = parseInt(minAge, 10);
+    if (maxAge) where.age.lte = parseInt(maxAge, 10);
+  }
+
+  const profiles = await prisma.extraProfile.findMany({
+    where,
+    include: { user: { select: { name: true } } },
+  });
+
+  const result = profiles.map((p) => ({
+    id: p.id,
+    name: p.user.name,
+    skills: p.skills,
+    availability: p.availability,
+  }));
+
+  return res.json(result);
+}
+
+// GET /profiles/:id — an ADMIN viewing one extra's full profile
+async function getProfileById(req, res) {
+  const { id } = req.params;
+
+  const profile = await prisma.extraProfile.findUnique({
+    where: { id },
+    include: { user: { select: { name: true } } },
+  });
+
+  if (!profile) {
+    return res.status(404).json({ error: 'Profile not found' });
+  }
+
+  const { user, ...rest } = profile;
+  return res.json({ ...rest, name: user.name });
+}
+
+module.exports = { getMyProfile, updateMyProfile, updateFcmToken, listProfiles, getProfileById };
+
