@@ -40,7 +40,9 @@ push notifications, live status dashboard, edge case handling, seed data).
 Part 1 (extra profile edit + mandatory face/full-body photo upload, secured via
 Firebase Storage) is complete, including visual styling — chip-based skill/language
 selection, a restricted gender dropdown, a boxed card layout, and contact info fields.
-Part 2 is next.
+Part 2 (admin: view and filter extra profiles) is also complete, including filtering
+by skill, gender, availability, and age range (with a filter-type dropdown and a
+clear-filters option), and a full profile detail view for admins. Part 3 is next.
 
 ## Getting started
 
@@ -78,6 +80,8 @@ Part 2 is next.
 | GET    | `/call-requests/:id`   | Admin | See invite status + accept/decline tally  |
 | GET    | `/invites/me`          | Extra | View your invites                         |
 | PATCH  | `/invites/:id`         | Extra | Accept or decline an invite               |
+| GET    | `/profiles`            | Admin | View all extra profiles, with filtering (skill, gender, availability, age) |
+| GET    | `/profiles/:id`        | Admin | View full detail of a single extra profile |
 
 ## Data model
 
@@ -108,9 +112,9 @@ See `prisma/schema.prisma` for the full schema.
       Storage, secured with per-user rules backed by a Firebase custom auth token)
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 2 — Admin: view extra profiles
-  - [ ] Functionality
-  - [ ] UI polish
+- [x] Part 2 — Admin: view extra profiles
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 3 — Cancel/decline distinction + lifetime tally view (both sides)
   - [ ] Functionality
   - [ ] UI polish
