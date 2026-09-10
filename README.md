@@ -44,7 +44,12 @@ Part 2 (admin: view and filter extra profiles) is also complete, including filte
 by skill, gender, availability, and age range (with a filter-type dropdown and a
 clear-filters option), and a full profile detail view for admins.
 Part 3 (cancel/decline distinction, lifetime worked/declined/cancelled tally, and a 3-strikes cancellation flag
-for admins) is also complete. Part 4 is next.
+for admins) is also complete.
+Part 4 (editing an existing shoot day's date/time and a
+call request's description/quantity, new navigation to browse shoot days from the app,
+a drill-down to see exactly who has accepted, declined, cancelled, or not yet responded
+to a call request, and push notifications to extras when a shoot day's date/time
+changes) is also complete. Part 5 is next.
 
 ## Getting started
 
@@ -78,8 +83,13 @@ for admins) is also complete. Part 4 is next.
 | POST   | `/auth/login`          | Any   | Log in, get a JWT                         |
 | GET    | `/profiles/me`         | Extra | View your own profile                     |
 | PATCH  | `/profiles/me`         | Extra | Update your own profile, including face/full-body photo     |
+| POST   | `/shoot-days`          | Admin | Create a shoot day                        |
+| GET    | `/shoot-days`          | Admin | List all shoot days                       |
+| GET    | `/shoot-days/:id`      | Admin | View a shoot day plus its call requests   |
+| PATCH  | `/shoot-days/:id`      | Admin | Edit a shoot day's date/time (notifies extras with an accepted invite) |
 | POST   | `/call-requests`       | Admin | Create a call, auto-matches eligible extras |
-| GET    | `/call-requests/:id`   | Admin | See invite status + accept/decline tally  |
+| PATCH  | `/call-requests/:id`   | Admin | Edit a call request's description/quantity needed |
+| GET    | `/call-requests/:id`   | Admin | See invite status + accept/decline/cancel tally |
 | GET    | `/invites/me`          | Extra | View your invites                         |
 | PATCH  | `/invites/:id`         | Extra | Accept, decline, or cancel (after accepting) an invite |
 | GET    | `/invites/tally/me`    | Extra | View your own lifetime worked/declined/cancelled tally |
@@ -120,9 +130,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 3 — Cancel/decline distinction + lifetime tally view (both sides)
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 4 — Edit shoot day / call request
-  - [ ] Functionality
-  - [ ] UI polish
+- [x] Part 4 — Edit shoot day / call request
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 5 — Bulk shoot day creation
   - [ ] Functionality
   - [ ] UI polish
