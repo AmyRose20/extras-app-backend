@@ -120,10 +120,53 @@ async function getCallRequestStatus(req, res) {
     needed: callRequest.quantityNeeded,
     accepted: callRequest.invites.filter((i) => i.status === 'ACCEPTED').length,
     declined: callRequest.invites.filter((i) => i.status === 'DECLINED').length,
+    cancelled: callRequest.invites.filter((i) => i.status === 'CANCELLED').length,
     pending: callRequest.invites.filter((i) => i.status === 'PENDING').length,
   };
 
   return res.json({ callRequest, tally });
 }
 
-module.exports = { createCallRequest, getCallRequestStatus };
+// PATCH /call-requests/:id — ADMIN edits description and/or quantityNeeded.
+// criteria/matching is intentionally untouched. Blocked once the
+// call request's shoot day has already passed.
+// body: { "description": "...", "quantityNeeded": 15 }  (either or both)
+async function updateCallRequest(req, res) {
+  try {
+    const { id } = req.params;
+    const { description, quantityNeeded } = req.body;
+
+    if (description === undefined && quantityNeeded === undefined) {
+      return res.status(400).json({ error: 'Provide description and/or quantityNeeded to update' });
+    }
+
+    const callRequest = await prisma.callRequest.findUnique({
+      where: { id },
+      include: { shootDay: true },
+    });
+
+    if (!callRequest) {
+      return res.status(404).json({ error: 'Call request not found' });
+    }
+
+    if (new Date(callRequest.shootDay.date) < new Date()) {
+      return res.status(400).json({ error: "This call request's shoot day has already passed and can no longer be edited" });
+    }
+
+    const data = {};
+    if (description !== undefined) data.description = description;
+    if (quantityNeeded !== undefined) data.quantityNeeded = quantityNeeded;
+
+    const updated = await prisma.callRequest.update({
+      where: { id },
+      data,
+    });
+
+    return res.json(updated);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Something went wrong updating that call request' });
+  }
+}
+
+module.exports = { createCallRequest, getCallRequestStatus, updateCallRequest };
