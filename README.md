@@ -49,7 +49,10 @@ Part 4 (editing an existing shoot day's date/time and a
 call request's description/quantity, new navigation to browse shoot days from the app,
 a drill-down to see exactly who has accepted, declined, cancelled, or not yet responded
 to a call request, and push notifications to extras when a shoot day's date/time
-changes) is also complete. Part 5 is next.
+changes) is also complete.
+Part 5 (bulk shoot day creation — an admin can
+schedule several days for one production in a single batch, each with its
+own date, time, and location) is also complete. Part 6 is next.
 
 ## Getting started
 
@@ -84,6 +87,7 @@ changes) is also complete. Part 5 is next.
 | GET    | `/profiles/me`         | Extra | View your own profile                     |
 | PATCH  | `/profiles/me`         | Extra | Update your own profile, including face/full-body photo     |
 | POST   | `/shoot-days`          | Admin | Create a shoot day                        |
+| POST   | `/shoot-days/bulk`     | Admin | Create several shoot days at once for one production |
 | GET    | `/shoot-days`          | Admin | List all shoot days                       |
 | GET    | `/shoot-days/:id`      | Admin | View a shoot day plus its call requests   |
 | PATCH  | `/shoot-days/:id`      | Admin | Edit a shoot day's date/time (notifies extras with an accepted invite) |
@@ -133,9 +137,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 4 — Edit shoot day / call request
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 5 — Bulk shoot day creation
-  - [ ] Functionality
-  - [ ] UI polish
+- [x] Part 5 — Bulk shoot day creation
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 6 — Calendar views (both sides)
   - [ ] Functionality
   - [ ] UI polish
