@@ -99,12 +99,10 @@ async function updateShootDay(req, res) {
       return res.status(400).json({ error: 'The new date/time cannot be in the past' });
     }
 
-        const updated = await prisma.shootDay.update({
+    const updated = await prisma.shootDay.update({
       where: { id },
       data: { date: newDate },
     });
-
-    await sendShootDayUpdateNotifications(updated);
 
     return res.json(updated);
   } catch (err) {
@@ -113,42 +111,50 @@ async function updateShootDay(req, res) {
   }
 }
 
-// Notifies extras who have ACCEPTED an invite on any of this shoot day's
-// call requests that the date/time has changed. Extras with a still-PENDING
-// invite aren't notified here — they'll see the updated date/time the next
-// time they load their invites, since that's always a live fetch anyway.
-async function sendShootDayUpdateNotifications(shootDay) {
-  const acceptedInvites = await prisma.callInvite.findMany({
-    where: {
-      status: 'ACCEPTED',
-      callRequest: { shootDayId: shootDay.id },
-    },
-    include: { extraProfile: true },
-  });
-
-  const tokens = acceptedInvites
-    .map((invite) => invite.extraProfile.fcmToken)
-    .filter((token) => token != null && token !== '');
-
-  if (tokens.length === 0) {
-    console.log('No FCM tokens to send to for this shoot day update');
-    return;
-  }
-
-  const message = {
-    notification: {
-      title: 'Shoot Day Updated',
-      body: `${shootDay.productionName}'s date/time has changed to ${new Date(shootDay.date).toLocaleString()}`,
-    },
-    tokens,
-  };
-
+// POST /shoot-days/bulk — ADMIN creates several shoot days at once for the
+// same production (e.g. scheduling a whole week in one go). Each day can
+// have its own date/time and location.
+// body: {
+//   "productionName": "Midnight Run",
+//   "shootDays": [
+//     { "date": "2026-09-22T08:00:00.000Z", "location": "Riverside Studios" },
+//     { "date": "2026-09-23T09:30:00.000Z", "location": "Downtown Lot" }
+//   ]
+// }
+async function createShootDaysBulk(req, res) {
   try {
-    const response = await getMessaging().sendEachForMulticast(message);
-    console.log(`Push sent: ${response.successCount} succeeded, ${response.failureCount} failed`);
-  } catch (error) {
-    console.error('Error sending shoot day update notifications:', error);
+    const { productionName, shootDays } = req.body;
+
+    if (!productionName || !Array.isArray(shootDays) || shootDays.length === 0) {
+      return res.status(400).json({
+        error: 'productionName and a non-empty shootDays array are required',
+      });
+    }
+
+    for (const day of shootDays) {
+      if (!day.date || !day.location) {
+        return res.status(400).json({ error: 'Each shoot day needs a date and a location' });
+      }
+    }
+
+    const created = await prisma.$transaction(
+      shootDays.map((day) =>
+        prisma.shootDay.create({
+          data: {
+            productionName,
+            date: new Date(day.date),
+            location: day.location,
+            createdById: req.user.userId,
+          },
+        })
+      )
+    );
+
+    return res.status(201).json(created);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Something went wrong creating those shoot days' });
   }
 }
 
-module.exports = { createShootDay, getShootDays, getShootDay, updateShootDay };
+module.exports = { createShootDay, getShootDays, getShootDay, updateShootDay, createShootDaysBulk };
