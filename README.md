@@ -52,7 +52,16 @@ to a call request, and push notifications to extras when a shoot day's date/time
 changes) is also complete.
 Part 5 (bulk shoot day creation — an admin can
 schedule several days for one production in a single batch, each with its
-own date, time, and location) is also complete. Part 6 is next.
+own date, time, and location) is also complete.
+Part 6 (calendar views for both sides — extras see their accepted shoot
+days marked on a calendar, admins see every shoot day — now embedded
+directly on the Home screen above the buttons, alongside a redesigned
+Home screen that merges shoot day creation into a single "Add Shoot Days"
+button, groups the admin's buttons under Schedule/Casting headings, and
+adds a hamburger menu on every screen for quick navigation home or
+logging out) is also complete, along with protection against creating or
+editing a shoot day onto a date the same production already has booked.
+Part 7 is next.
 
 ## Getting started
 
@@ -87,10 +96,10 @@ own date, time, and location) is also complete. Part 6 is next.
 | GET    | `/profiles/me`         | Extra | View your own profile                     |
 | PATCH  | `/profiles/me`         | Extra | Update your own profile, including face/full-body photo     |
 | POST   | `/shoot-days`          | Admin | Create a shoot day                        |
-| POST   | `/shoot-days/bulk`     | Admin | Create several shoot days at once for one production |
+| POST   | `/shoot-days/bulk`     | Admin | Create several shoot days at once for one production (blocks duplicate dates within the same production) |
 | GET    | `/shoot-days`          | Admin | List all shoot days                       |
 | GET    | `/shoot-days/:id`      | Admin | View a shoot day plus its call requests   |
-| PATCH  | `/shoot-days/:id`      | Admin | Edit a shoot day's date/time (notifies extras with an accepted invite) |
+| PATCH  | `/shoot-days/:id`      | Admin | Edit a shoot day's date/time (notifies extras with an accepted invite; blocked if the new date collides with another shoot day for the same production) |
 | POST   | `/call-requests`       | Admin | Create a call, auto-matches eligible extras |
 | PATCH  | `/call-requests/:id`   | Admin | Edit a call request's description/quantity needed |
 | GET    | `/call-requests/:id`   | Admin | See invite status + accept/decline/cancel tally |
@@ -140,9 +149,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 5 — Bulk shoot day creation
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 6 — Calendar views (both sides)
-  - [ ] Functionality
-  - [ ] UI polish
+- [x] Part 6 — Calendar views (both sides)
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 7 — Profile deletion request/approval flow
   - [ ] Functionality
   - [ ] UI polish
