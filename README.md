@@ -61,7 +61,14 @@ button, groups the admin's buttons under Schedule/Casting headings, and
 adds a hamburger menu on every screen for quick navigation home or
 logging out) is also complete, along with protection against creating or
 editing a shoot day onto a date the same production already has booked.
-Part 7 is next.
+Part 7 (profile deletion request/approval flow) is also complete: an extra can
+request their own account be deleted — or cancel that request — from the
+hamburger menu, and an admin can also initiate a deletion request from an
+extra's profile detail screen. Admins review all pending requests from a
+dedicated Deletion Requests screen, where they can approve (soft-deletes the
+account: blocks login and excludes the extra from future call-request
+matching, while keeping their historical invite/tally data intact) or deny.
+Part 8 is next.
 
 ## Getting started
 
@@ -107,10 +114,18 @@ Part 7 is next.
 | PATCH  | `/invites/:id`         | Extra | Accept, decline, or cancel (after accepting) an invite |
 | GET    | `/invites/tally/me`    | Extra | View your own lifetime worked/declined/cancelled tally |
 | GET    | `/invites/tally/:extraProfileId` | Admin | View any extra's lifetime tally + 3-strikes flag |
+| POST   | `/deletion-requests/me`          | Extra | Request your own account be deleted        |
+| DELETE | `/deletion-requests/me`          | Extra | Cancel your own pending deletion request    |
+| POST   | `/deletion-requests/:id`         | Admin | Initiate a deletion request for an extra    |
+| GET    | `/deletion-requests`             | Admin | List all pending deletion requests          |
+| PATCH  | `/deletion-requests/:id/approve` | Admin | Approve a request (soft-deletes the account)|
+| PATCH  | `/deletion-requests/:id/deny`    | Admin | Deny a deletion request                     |
 
 ## Data model
 
-- `users` — accounts, either ADMIN (coordinator) or EXTRA
+- `users` — accounts, either ADMIN (coordinator) or EXTRA; tracks an optional
+  pending deletion request (self- or admin-initiated) and a soft-delete flag
+  once one is approved
 - `extra_profiles` — age, gender, height, skills, languages, phone/contact email,
   availability, photo
 - `shoot_days` — a production's shoot day (date, location)
@@ -152,9 +167,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 6 — Calendar views (both sides)
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 7 — Profile deletion request/approval flow
-  - [ ] Functionality
-  - [ ] UI polish
+- [x] Part 7 — Profile deletion request/approval flow
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 8 — Login page visual
   - [ ] Functionality
   - [ ] UI polish
