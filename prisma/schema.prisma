@@ -32,6 +32,18 @@ enum InviteStatus {
   EXPIRED
 }
 
+enum DeletionRequestStatus {
+  NONE
+  PENDING
+  APPROVED
+  DENIED
+}
+
+enum DeletionRequestedBy {
+  EXTRA
+  ADMIN
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -48,6 +60,14 @@ model User {
   shootDaysCreated ShootDay[]
 
   @@map("users")
+
+  deletionRequestStatus     DeletionRequestStatus @default(NONE)
+  deletionRequestedAt       DateTime?
+  deletionRequestedBy       DeletionRequestedBy?
+  deletionReason            String?
+  deletionReviewedAt        DateTime?
+  deletionReviewedByAdminId String?
+  deletedAt                 DateTime?
 }
 
 model ExtraProfile {

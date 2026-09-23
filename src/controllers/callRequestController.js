@@ -95,6 +95,10 @@ async function findMatchingExtras(criteria) {
       },
       gender: gender ?? undefined,
       skills: skills && skills.length > 0 ? { hasEvery: skills } : undefined,
+      user: {
+        deletedAt: null,
+        deletionRequestStatus: { not: 'PENDING' },
+      },
     },
   });
 }

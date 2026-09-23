@@ -61,6 +61,10 @@ async function login(req, res) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    if (user.deletedAt) {
+      return res.status(403).json({ error: 'This account has been deleted' });
+    }
+
     const token = signToken(user);
     const firebaseToken = await getAuth(firebaseApp).createCustomToken(user.id);
 

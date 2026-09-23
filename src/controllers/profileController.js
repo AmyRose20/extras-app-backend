@@ -4,12 +4,24 @@ const prisma = require('../config/db');
 async function getMyProfile(req, res) {
   const profile = await prisma.extraProfile.findUnique({
     where: { userId: req.user.userId },
+    include: {
+      user: {
+        select: { deletionRequestStatus: true, deletionRequestedAt: true, deletionReason: true },
+      },
+    },
   });
 
   if (!profile) {
     return res.status(404).json({ error: 'Profile not found' });
   }
-  return res.json(profile);
+
+  const { user, ...rest } = profile;
+  return res.json({
+    ...rest,
+    deletionRequestStatus: user.deletionRequestStatus,
+    deletionRequestedAt: user.deletionRequestedAt,
+    deletionReason: user.deletionReason,
+  });
 }
 
 // PATCH /profiles/me — an EXTRA updating their own profile
@@ -96,7 +108,7 @@ async function getProfileById(req, res) {
 
   const profile = await prisma.extraProfile.findUnique({
     where: { id },
-    include: { user: { select: { name: true } } },
+    include: { user: { select: { name: true, deletionRequestStatus: true } } },
   });
 
   if (!profile) {
@@ -104,8 +116,7 @@ async function getProfileById(req, res) {
   }
 
   const { user, ...rest } = profile;
-  return res.json({ ...rest, name: user.name });
+  return res.json({ ...rest, name: user.name, deletionRequestStatus: user.deletionRequestStatus });
 }
 
 module.exports = { getMyProfile, updateMyProfile, updateFcmToken, listProfiles, getProfileById };
-
