@@ -21,6 +21,7 @@ based on firsthand experience working as a film extra.
 ## Status
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
+✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
 
 ## Screenshots
 
@@ -68,7 +69,12 @@ extra's profile detail screen. Admins review all pending requests from a
 dedicated Deletion Requests screen, where they can approve (soft-deletes the
 account: blocks login and excludes the extra from future call-request
 matching, while keeping their historical invite/tally data intact) or deny.
-Part 8 is next.
+Part 8 (a consistent visual theme applied across the entire app — a custom
+login screen with its own background artwork, and a dark "dusk" gradient
+theme with glass-style cards and gold accents applied to every other screen)
+is also complete.
+
+🔜 Phase 3 — the final project phase, up next. Details coming soon.
 
 ## Getting started
 
@@ -170,9 +176,12 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 7 — Profile deletion request/approval flow
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 8 — Login page visual
-  - [ ] Functionality
-  - [ ] UI polish
+- [x] Part 8 — Login page visual
+  - [x] Functionality
+  - [x] UI polish
+
+## Roadmap — Phase 3 (final project phase)
+- [ ] Details coming soon
 
 ## License
 
