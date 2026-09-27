@@ -1,3 +1,5 @@
+require('../config/firebase'); // initializes the Firebase app
+const { getMessaging } = require('firebase-admin/messaging');
 const prisma = require('../config/db');
 
 // Every coordinator must be linked to a production. Returns the
@@ -153,4 +155,157 @@ async function getProfileById(req, res) {
   }
 }
 
-module.exports = { getMyProfile, updateMyProfile, updateFcmToken, listProfiles, getProfileById };
+// PATCH /profiles/me/productions — an EXTRA sets which productions they're on.
+// body: { "productionIds": ["...", "..."] }  (the FULL list they want, not just changes)
+// Rules:
+//  - must keep at least one production
+//  - can't leave a production they have upcoming ACCEPTED shoot days on
+//  - pending invites on upcoming shoot days of a removed production become EXPIRED
+async function updateMyProductions(req, res) {
+  try {
+    const { productionIds } = req.body;
+
+    if (!Array.isArray(productionIds) || productionIds.length === 0) {
+      return res.status(400).json({ error: 'You must be on at least one production' });
+    }
+
+    // Make sure every id is a real production
+    const validProductions = await prisma.production.findMany({
+      where: { id: { in: productionIds } },
+    });
+    if (validProductions.length !== productionIds.length) {
+      return res.status(400).json({ error: 'One or more productions were not found' });
+    }
+
+    const profile = await prisma.extraProfile.findUnique({
+      where: { userId: req.user.userId },
+      include: { productions: true },
+    });
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    // Which productions are being removed?
+    const removedIds = profile.productions
+      .map((p) => p.id)
+      .filter((id) => !productionIds.includes(id));
+
+    const now = new Date();
+
+    if (removedIds.length > 0) {
+      // Block if they're booked (ACCEPTED) on an upcoming shoot day for a removed production
+      const bookedInvites = await prisma.callInvite.findMany({
+        where: {
+          extraProfileId: profile.id,
+          status: 'ACCEPTED',
+          callRequest: { shootDay: { productionId: { in: removedIds }, date: { gt: now } } },
+        },
+        include: { callRequest: { include: { shootDay: { include: { production: true } } } } },
+      });
+
+      if (bookedInvites.length > 0) {
+        const productionName = bookedInvites[0].callRequest.shootDay.production.name;
+        return res.status(400).json({
+          error: `You're booked on ${bookedInvites.length} upcoming shoot day(s) for ${productionName}. Cancel those first.`,
+        });
+      }
+    }
+
+    // Do both changes together: update the list + expire pending invites on removed productions
+    const [updated] = await prisma.$transaction([
+      prisma.extraProfile.update({
+        where: { id: profile.id },
+        data: { productions: { set: productionIds.map((id) => ({ id })) } },
+        include: { productions: { select: { id: true, name: true } } },
+      }),
+      prisma.callInvite.updateMany({
+        where: {
+          extraProfileId: profile.id,
+          status: 'PENDING',
+          callRequest: { shootDay: { productionId: { in: removedIds }, date: { gt: now } } },
+        },
+        data: { status: 'EXPIRED' },
+      }),
+    ]);
+
+    return res.json(updated.productions);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Something went wrong updating your productions' });
+  }
+}
+
+// DELETE /profiles/:id/production — an ADMIN removes an extra from THEIR production.
+// The extra's account and other productions are untouched.
+// Their pending + accepted invites on upcoming shoot days for this production become EXPIRED
+// (not CANCELLED — it wasn't the extra's choice, so it doesn't count against them).
+async function removeExtraFromMyProduction(req, res) {
+  try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
+    const { id } = req.params;
+
+    const profile = await prisma.extraProfile.findFirst({
+      where: { id, productions: { some: { id: productionId } } },
+      include: { productions: true },
+    });
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    if (profile.productions.length === 1) {
+      return res.status(400).json({
+        error: "This is the extra's only production. Use a deletion request instead.",
+      });
+    }
+
+    const production = profile.productions.find((p) => p.id === productionId);
+    const now = new Date();
+
+    await prisma.$transaction([
+      prisma.extraProfile.update({
+        where: { id: profile.id },
+        data: { productions: { disconnect: { id: productionId } } },
+      }),
+      prisma.callInvite.updateMany({
+        where: {
+          extraProfileId: profile.id,
+          status: { in: ['PENDING', 'ACCEPTED'] },
+          callRequest: { shootDay: { productionId, date: { gt: now } } },
+        },
+        data: { status: 'EXPIRED' },
+      }),
+    ]);
+
+    // Let the extra know (skipped quietly if they have no push token)
+    if (profile.fcmToken) {
+      try {
+        await getMessaging().send({
+          token: profile.fcmToken,
+          notification: {
+            title: 'Production update',
+            body: `You've been removed from ${production.name}.`,
+          },
+        });
+      } catch (pushErr) {
+        console.error('Error sending removal notification:', pushErr);
+      }
+    }
+
+    return res.json({ message: `Removed from ${production.name}` });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Something went wrong removing that extra' });
+  }
+}
+
+module.exports = {
+  getMyProfile,
+  updateMyProfile,
+  updateFcmToken,
+  listProfiles,
+  getProfileById,
+  updateMyProductions,
+  removeExtraFromMyProduction,
+};
