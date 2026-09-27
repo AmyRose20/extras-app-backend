@@ -51,7 +51,10 @@ async function login(req, res) {
       return res.status(400).json({ error: 'email and password are required' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { production: { select: { id: true, name: true } } },
+    });
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -68,7 +71,11 @@ async function login(req, res) {
     const token = signToken(user);
     const firebaseToken = await getAuth(firebaseApp).createCustomToken(user.id);
 
-    return res.json({ token, firebaseToken, user: toPublicUser(user) });
+    return res.json({
+      token,
+      firebaseToken,
+      user: { ...toPublicUser(user), production: user.production },
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Something went wrong logging in' });
