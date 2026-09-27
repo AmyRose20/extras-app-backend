@@ -2,8 +2,18 @@ const prisma = require('../config/db');
 require('../config/firebase'); // initializes the Firebase app
 const { getMessaging } = require('firebase-admin/messaging');
 
-// POST /call-requests — ADMIN creates a call for a shoot day and the
-// matching extras are found and invited automatically.
+// Every coordinator must be linked to a production. Returns the
+// productionId, or sends a 403 and returns null if they aren't linked.
+function requireProduction(req, res) {
+  if (!req.user.productionId) {
+    res.status(403).json({ error: 'Your account is not linked to a production' });
+    return null;
+  }
+  return req.user.productionId;
+}
+
+// POST /call-requests — ADMIN creates a call for one of THEIR production's
+// shoot days, and matching extras (on that production) are invited automatically.
 //
 // Expected body:
 // {
@@ -14,6 +24,9 @@ const { getMessaging } = require('firebase-admin/messaging');
 // }
 async function createCallRequest(req, res) {
   try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
     const { shootDayId, description, quantityNeeded, criteria } = req.body;
 
     if (!shootDayId || !description || !quantityNeeded || !criteria) {
@@ -22,11 +35,19 @@ async function createCallRequest(req, res) {
       });
     }
 
+    // Make sure the shoot day belongs to this coordinator's production
+    const shootDay = await prisma.shootDay.findFirst({
+      where: { id: shootDayId, productionId },
+    });
+    if (!shootDay) {
+      return res.status(404).json({ error: 'Shoot day not found' });
+    }
+
     const callRequest = await prisma.callRequest.create({
       data: { shootDayId, description, quantityNeeded, criteria },
     });
 
-    const matchedExtras = await findMatchingExtras(criteria);
+    const matchedExtras = await findMatchingExtras(criteria, productionId);
 
     if (matchedExtras.length > 0) {
       await prisma.callInvite.createMany({
@@ -37,8 +58,6 @@ async function createCallRequest(req, res) {
         skipDuplicates: true,
       });
 
-      // Sending the actual push notifications happens here in a later step
-      // (Week 6) via Firebase Cloud Messaging — this is the hook point.
       await sendPushNotifications(matchedExtras, callRequest);
     }
 
@@ -82,13 +101,15 @@ async function sendPushNotifications(matchedExtras, callRequest) {
   }
 }
 
-// Finds extra profiles matching the given criteria.
+// Finds extra profiles matching the given criteria, limited to extras
+// linked to the given production (extras on both productions still match).
 // criteria can include: minAge, maxAge, gender, skills (array — extra must have ALL listed skills)
-async function findMatchingExtras(criteria) {
+async function findMatchingExtras(criteria, productionId) {
   const { minAge, maxAge, gender, skills } = criteria;
 
   return prisma.extraProfile.findMany({
     where: {
+      productions: { some: { id: productionId } },
       age: {
         gte: minAge ?? undefined,
         lte: maxAge ?? undefined,
@@ -103,32 +124,48 @@ async function findMatchingExtras(criteria) {
   });
 }
 
-// GET /call-requests/:id — see the invites and their current status
+// GET /call-requests/:id — see the invites and their current status.
+// Only works for call requests on this coordinator's production.
 async function getCallRequestStatus(req, res) {
-  const { id } = req.params;
+  try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
 
-  const callRequest = await prisma.callRequest.findUnique({
-    where: { id },
-    include: {
-      invites: {
-        include: { extraProfile: { include: { user: true } } },
+    const { id } = req.params;
+
+    const callRequest = await prisma.callRequest.findFirst({
+      where: { id, shootDay: { productionId } },
+      include: {
+        invites: {
+          include: {
+            extraProfile: {
+              include: {
+                // only the fields the app needs — no passwordHash
+                user: { select: { id: true, name: true, email: true, phone: true } },
+              },
+            },
+          },
+        },
       },
-    },
-  });
+    });
 
-  if (!callRequest) {
-    return res.status(404).json({ error: 'Call request not found' });
+    if (!callRequest) {
+      return res.status(404).json({ error: 'Call request not found' });
+    }
+
+    const tally = {
+      needed: callRequest.quantityNeeded,
+      accepted: callRequest.invites.filter((i) => i.status === 'ACCEPTED').length,
+      declined: callRequest.invites.filter((i) => i.status === 'DECLINED').length,
+      cancelled: callRequest.invites.filter((i) => i.status === 'CANCELLED').length,
+      pending: callRequest.invites.filter((i) => i.status === 'PENDING').length,
+    };
+
+    return res.json({ callRequest, tally });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Something went wrong loading that call request' });
   }
-
-  const tally = {
-    needed: callRequest.quantityNeeded,
-    accepted: callRequest.invites.filter((i) => i.status === 'ACCEPTED').length,
-    declined: callRequest.invites.filter((i) => i.status === 'DECLINED').length,
-    cancelled: callRequest.invites.filter((i) => i.status === 'CANCELLED').length,
-    pending: callRequest.invites.filter((i) => i.status === 'PENDING').length,
-  };
-
-  return res.json({ callRequest, tally });
 }
 
 // PATCH /call-requests/:id — ADMIN edits description and/or quantityNeeded.
@@ -137,6 +174,9 @@ async function getCallRequestStatus(req, res) {
 // body: { "description": "...", "quantityNeeded": 15 }  (either or both)
 async function updateCallRequest(req, res) {
   try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
     const { id } = req.params;
     const { description, quantityNeeded } = req.body;
 
@@ -144,8 +184,8 @@ async function updateCallRequest(req, res) {
       return res.status(400).json({ error: 'Provide description and/or quantityNeeded to update' });
     }
 
-    const callRequest = await prisma.callRequest.findUnique({
-      where: { id },
+    const callRequest = await prisma.callRequest.findFirst({
+      where: { id, shootDay: { productionId } },
       include: { shootDay: true },
     });
 

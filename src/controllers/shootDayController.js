@@ -2,6 +2,9 @@ const prisma = require('../config/db');
 require('../config/firebase'); // initializes the Firebase app
 const { getMessaging } = require('firebase-admin/messaging');
 
+// Include this on shoot day queries so responses carry the production's name.
+const PRODUCTION_SELECT = { select: { id: true, name: true } };
+
 // A key that identifies a calendar date regardless of the time portion,
 // so two shoot days on the same day but different times still count as
 // a clash.
@@ -19,24 +22,37 @@ function formatDateForMessage(date) {
   return `${day}-${month}-${year}`;
 }
 
-// POST /shoot-days — ADMIN creates a new shoot day
+// Every coordinator must be linked to a production. Returns the
+// productionId, or sends a 403 and returns null if they aren't linked.
+function requireProduction(req, res) {
+  if (!req.user.productionId) {
+    res.status(403).json({ error: 'Your account is not linked to a production' });
+    return null;
+  }
+  return req.user.productionId;
+}
+
+// POST /shoot-days — ADMIN creates a new shoot day for THEIR production
+// body: { "date": "...", "location": "..." }
 async function createShootDay(req, res) {
   try {
-    const { productionName, date, location } = req.body;
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
 
-    if (!productionName || !date || !location) {
-      return res.status(400).json({
-        error: 'productionName, date and location are required',
-      });
+    const { date, location } = req.body;
+
+    if (!date || !location) {
+      return res.status(400).json({ error: 'date and location are required' });
     }
 
     const shootDay = await prisma.shootDay.create({
       data: {
-        productionName,
+        productionId,
         date: new Date(date),
         location,
         createdById: req.user.userId,
       },
+      include: { production: PRODUCTION_SELECT },
     });
 
     return res.status(201).json(shootDay);
@@ -46,11 +62,16 @@ async function createShootDay(req, res) {
   }
 }
 
-// GET /shoot-days — ADMIN sees every shoot day, most recent first
+// GET /shoot-days — ADMIN sees every shoot day for THEIR production, most recent first
 async function getShootDays(req, res) {
   try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
     const shootDays = await prisma.shootDay.findMany({
+      where: { productionId },
       orderBy: { date: 'desc' },
+      include: { production: PRODUCTION_SELECT },
     });
 
     const withPastFlag = shootDays.map((day) => ({
@@ -65,14 +86,19 @@ async function getShootDays(req, res) {
   }
 }
 
-// GET /shoot-days/:id — ADMIN sees one shoot day plus its call requests
+// GET /shoot-days/:id — ADMIN sees one shoot day plus its call requests.
+// Only works for shoot days in their own production.
 async function getShootDay(req, res) {
   try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
     const { id } = req.params;
 
-    const shootDay = await prisma.shootDay.findUnique({
-      where: { id },
-      include: { callRequests: true },
+    // findFirst (not findUnique) so we can filter on productionId as well as id
+    const shootDay = await prisma.shootDay.findFirst({
+      where: { id, productionId },
+      include: { callRequests: true, production: PRODUCTION_SELECT },
     });
 
     if (!shootDay) {
@@ -95,6 +121,9 @@ async function getShootDay(req, res) {
 // body: { "date": "2026-10-01T18:00:00.000Z" }
 async function updateShootDay(req, res) {
   try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
     const { id } = req.params;
     const { date } = req.body;
 
@@ -102,7 +131,10 @@ async function updateShootDay(req, res) {
       return res.status(400).json({ error: 'date is required' });
     }
 
-    const shootDay = await prisma.shootDay.findUnique({ where: { id } });
+    const shootDay = await prisma.shootDay.findFirst({
+      where: { id, productionId },
+      include: { production: PRODUCTION_SELECT },
+    });
     if (!shootDay) {
       return res.status(404).json({ error: 'Shoot day not found' });
     }
@@ -111,14 +143,15 @@ async function updateShootDay(req, res) {
       return res.status(400).json({ error: 'This shoot day has already passed and can no longer be edited' });
     }
 
-        const newDate = new Date(date);
+    const newDate = new Date(date);
     if (newDate < new Date()) {
       return res.status(400).json({ error: 'The new date/time cannot be in the past' });
     }
 
+    // Same production can't have two shoot days on the same calendar date
     const otherShootDays = await prisma.shootDay.findMany({
       where: {
-        productionName: shootDay.productionName,
+        productionId,
         id: { not: shootDay.id },
       },
       select: { date: true },
@@ -128,13 +161,14 @@ async function updateShootDay(req, res) {
 
     if (conflict) {
       return res.status(400).json({
-        error: `${shootDay.productionName} already has a shoot day on ${formatDateForMessage(newDate)}`,
+        error: `${shootDay.production.name} already has a shoot day on ${formatDateForMessage(newDate)}`,
       });
     }
 
     const updated = await prisma.shootDay.update({
       where: { id },
       data: { date: newDate },
+      include: { production: PRODUCTION_SELECT },
     });
 
     await sendShootDayUpdateNotifications(updated);
@@ -147,7 +181,7 @@ async function updateShootDay(req, res) {
 }
 
 // Notify every extra with an ACCEPTED invite on this shoot day that its
-// date/time has changed.
+// date/time has changed. Expects shootDay to include production.
 async function sendShootDayUpdateNotifications(shootDay) {
   try {
     const acceptedInvites = await prisma.callInvite.findMany({
@@ -169,7 +203,7 @@ async function sendShootDayUpdateNotifications(shootDay) {
     const message = {
       notification: {
         title: 'Shoot day updated',
-        body: `${shootDay.productionName} has a new date/time: ${formatDateForMessage(shootDay.date)}`,
+        body: `${shootDay.production.name} has a new date/time: ${formatDateForMessage(shootDay.date)}`,
       },
       tokens,
     };
@@ -181,46 +215,9 @@ async function sendShootDayUpdateNotifications(shootDay) {
   }
 }
 
-// Notify every extra with an ACCEPTED invite on this shoot day that its
-// date/time has changed.
-async function sendShootDayUpdateNotifications(shootDay) {
-  try {
-    const acceptedInvites = await prisma.callInvite.findMany({
-      where: {
-        status: 'ACCEPTED',
-        callRequest: { shootDayId: shootDay.id },
-      },
-      include: { extraProfile: true },
-    });
-
-    const tokens = acceptedInvites
-      .map((invite) => invite.extraProfile.fcmToken)
-      .filter((token) => !!token);
-
-    if (tokens.length === 0) {
-      return;
-    }
-
-    const message = {
-      notification: {
-        title: 'Shoot day updated',
-        body: `${shootDay.productionName} has a new date/time: ${formatDateForMessage(shootDay.date)}`,
-      },
-      tokens,
-    };
-
-    const response = await getMessaging().sendEachForMulticast(message);
-    console.log(`Push sent: ${response.successCount} succeeded, ${response.failureCount} failed`);
-  } catch (err) {
-    console.error('Error sending shoot day update notifications:', err);
-  }
-}
-
-// POST /shoot-days/bulk — ADMIN creates several shoot days at once for the
-// same production (e.g. scheduling a whole week in one go). Each day can
-// have its own date/time and location.
+// POST /shoot-days/bulk — ADMIN creates several shoot days at once for
+// THEIR production. Each day can have its own date/time and location.
 // body: {
-//   "productionName": "Midnight Run",
 //   "shootDays": [
 //     { "date": "2026-09-22T08:00:00.000Z", "location": "Riverside Studios" },
 //     { "date": "2026-09-23T09:30:00.000Z", "location": "Downtown Lot" }
@@ -228,19 +225,23 @@ async function sendShootDayUpdateNotifications(shootDay) {
 // }
 async function createShootDaysBulk(req, res) {
   try {
-    const { productionName, shootDays } = req.body;
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
 
-    if (!productionName || !Array.isArray(shootDays) || shootDays.length === 0) {
-      return res.status(400).json({
-        error: 'productionName and a non-empty shootDays array are required',
-      });
+    const { shootDays } = req.body;
+
+    if (!Array.isArray(shootDays) || shootDays.length === 0) {
+      return res.status(400).json({ error: 'A non-empty shootDays array is required' });
     }
 
-        for (const day of shootDays) {
+    for (const day of shootDays) {
       if (!day.date || !day.location) {
         return res.status(400).json({ error: 'Each shoot day needs a date and a location' });
       }
     }
+
+    // Look up the production's name for error messages
+    const production = await prisma.production.findUnique({ where: { id: productionId } });
 
     // Catch two days in this same batch landing on the same calendar date.
     const seenDayKeys = new Set();
@@ -248,7 +249,7 @@ async function createShootDaysBulk(req, res) {
       const dayKey = toDayKey(day.date);
       if (seenDayKeys.has(dayKey)) {
         return res.status(400).json({
-          error: `You've entered more than one shoot day for ${productionName} on ${formatDateForMessage(day.date)}`,
+          error: `You've entered more than one shoot day for ${production.name} on ${formatDateForMessage(day.date)}`,
         });
       }
       seenDayKeys.add(dayKey);
@@ -256,7 +257,7 @@ async function createShootDaysBulk(req, res) {
 
     // Catch a date this production already has a shoot day on.
     const existingShootDays = await prisma.shootDay.findMany({
-      where: { productionName },
+      where: { productionId },
       select: { date: true },
     });
     const existingDayKeys = new Set(existingShootDays.map((d) => toDayKey(d.date)));
@@ -264,7 +265,7 @@ async function createShootDaysBulk(req, res) {
     const conflict = shootDays.find((day) => existingDayKeys.has(toDayKey(day.date)));
     if (conflict) {
       return res.status(400).json({
-        error: `${productionName} already has a shoot day on ${formatDateForMessage(conflict.date)}`,
+        error: `${production.name} already has a shoot day on ${formatDateForMessage(conflict.date)}`,
       });
     }
 
@@ -272,11 +273,12 @@ async function createShootDaysBulk(req, res) {
       shootDays.map((day) =>
         prisma.shootDay.create({
           data: {
-            productionName,
+            productionId,
             date: new Date(day.date),
             location: day.location,
             createdById: req.user.userId,
           },
+          include: { production: PRODUCTION_SELECT },
         })
       )
     );

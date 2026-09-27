@@ -5,6 +5,16 @@ const prisma = require('../config/db');
 const CANCEL_WINDOW_DAYS = 90;
 const THREE_STRIKES_THRESHOLD = 3;
 
+// Every coordinator must be linked to a production. Returns the
+// productionId, or sends a 403 and returns null if they aren't linked.
+function requireProduction(req, res) {
+  if (!req.user.productionId) {
+    res.status(403).json({ error: 'Your account is not linked to a production' });
+    return null;
+  }
+  return req.user.productionId;
+}
+
 // GET /invites/me — an EXTRA sees their own pending/past invites
 async function getMyInvites(req, res) {
   const profile = await prisma.extraProfile.findUnique({
@@ -17,7 +27,13 @@ async function getMyInvites(req, res) {
 
   const invites = await prisma.callInvite.findMany({
     where: { extraProfileId: profile.id },
-    include: { callRequest: { include: { shootDay: true } } },
+    include: {
+      callRequest: {
+        include: {
+          shootDay: { include: { production: { select: { id: true, name: true } } } },
+        },
+      },
+    },
     orderBy: { sentAt: 'desc' },
   });
 
@@ -56,7 +72,7 @@ async function respondToInvite(req, res) {
     where: { id },
     include: { callRequest: { include: { shootDay: true } } },
   });
-  if (!invite || invite.extraProfileId !== profile.id) {
+  if (!profile || !invite || invite.extraProfileId !== profile.id) {
     return res.status(404).json({ error: 'Invite not found' });
   }
 
@@ -82,25 +98,43 @@ async function respondToInvite(req, res) {
 // "declined" / "cancelled" = lifetime totals of those statuses.
 // "threeStrikes" = true if CANCELLED count in the last CANCEL_WINDOW_DAYS
 // days is at or above THREE_STRIKES_THRESHOLD.
-async function buildTally(extraProfileId) {
+// If productionId is given, only invites for that production are counted
+// (coordinator view). If not, all productions are counted (extra's own view).
+async function buildTally(extraProfileId, productionId = null) {
   const windowStart = new Date(Date.now() - CANCEL_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+  // Added to every count below when we're limiting to one production
+  const productionFilter = productionId ? { productionId } : {};
 
   const [worked, declined, cancelled, recentCancelled] = await Promise.all([
     prisma.callInvite.count({
       where: {
         extraProfileId,
         status: 'ACCEPTED',
-        callRequest: { shootDay: { date: { lt: new Date() } } },
+        callRequest: { shootDay: { date: { lt: new Date() }, ...productionFilter } },
       },
     }),
     prisma.callInvite.count({
-      where: { extraProfileId, status: 'DECLINED' },
+      where: {
+        extraProfileId,
+        status: 'DECLINED',
+        callRequest: { shootDay: productionFilter },
+      },
     }),
     prisma.callInvite.count({
-      where: { extraProfileId, status: 'CANCELLED' },
+      where: {
+        extraProfileId,
+        status: 'CANCELLED',
+        callRequest: { shootDay: productionFilter },
+      },
     }),
     prisma.callInvite.count({
-      where: { extraProfileId, status: 'CANCELLED', respondedAt: { gte: windowStart } },
+      where: {
+        extraProfileId,
+        status: 'CANCELLED',
+        respondedAt: { gte: windowStart },
+        callRequest: { shootDay: productionFilter },
+      },
     }),
   ]);
 
@@ -125,19 +159,28 @@ async function getMyTally(req, res) {
   return res.json(tally);
 }
 
-// GET /invites/tally/:extraProfileId — an ADMIN sees any extra's lifetime tally
+// GET /invites/tally/:extraProfileId — an ADMIN sees the lifetime tally
+// of an extra on THEIR production
 async function getExtraTally(req, res) {
-  const { extraProfileId } = req.params;
+  try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
 
-  const profile = await prisma.extraProfile.findUnique({
-    where: { id: extraProfileId },
-  });
-  if (!profile) {
-    return res.status(404).json({ error: 'Extra profile not found' });
+    const { extraProfileId } = req.params;
+
+    const profile = await prisma.extraProfile.findFirst({
+      where: { id: extraProfileId, productions: { some: { id: productionId } } },
+    });
+    if (!profile) {
+      return res.status(404).json({ error: 'Extra profile not found' });
+    }
+
+    const tally = await buildTally(extraProfileId, productionId);
+    return res.json(tally);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Something went wrong loading that tally' });
   }
-
-  const tally = await buildTally(extraProfileId);
-  return res.json(tally);
 }
 
 module.exports = { getMyInvites, respondToInvite, getMyTally, getExtraTally };

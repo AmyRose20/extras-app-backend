@@ -17,13 +17,14 @@ async function requireAuth(req, res, next) {
     // Reject tokens belonging to an account that's since been deleted
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { deletedAt: true },
+      select: { deletedAt: true, productionId: true },
     });
     if (!user || user.deletedAt) {
       return res.status(401).json({ error: 'This account no longer exists' });
     }
 
-    req.user = payload; // { userId, role }
+    // productionId is set for coordinators (ADMIN), null for extras
+    req.user = { ...payload, productionId: user.productionId }; // { userId, role, productionId }
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });

@@ -13,6 +13,28 @@ function toDeletionStatusPayload(user) {
   };
 }
 
+// Every coordinator must be linked to a production. Returns the
+// productionId, or sends a 403 and returns null if they aren't linked.
+function requireProduction(req, res) {
+  if (!req.user.productionId) {
+    res.status(403).json({ error: 'Your account is not linked to a production' });
+    return null;
+  }
+  return req.user.productionId;
+}
+
+// Finds an EXTRA user by id, but only if they're on the given production.
+// Returns null if they don't exist, aren't an extra, or are on another production.
+function findExtraOnProduction(userId, productionId) {
+  return prisma.user.findFirst({
+    where: {
+      id: userId,
+      role: 'EXTRA',
+      extraProfile: { productions: { some: { id: productionId } } },
+    },
+  });
+}
+
 // POST /deletion-requests/me  (extra requests their own account be deleted)
 async function requestOwnDeletion(req, res) {
   try {
@@ -79,11 +101,14 @@ async function cancelOwnDeletion(req, res) {
 // POST /deletion-requests/:id  (admin initiates a deletion request on behalf of an extra)
 async function adminRequestDeletion(req, res) {
   try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
     const userId = req.params.id;
     const { reason } = req.body;
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || user.role !== 'EXTRA') {
+    const user = await findExtraOnProduction(userId, productionId);
+    if (!user) {
       return res.status(404).json({ error: 'Extra not found' });
     }
     if (user.deletionRequestStatus === 'PENDING') {
@@ -112,8 +137,15 @@ async function adminRequestDeletion(req, res) {
 // GET /deletion-requests  (admin: list all pending deletion requests)
 async function listPendingDeletionRequests(req, res) {
   try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
     const users = await prisma.user.findMany({
-      where: { deletionRequestStatus: 'PENDING', role: 'EXTRA' },
+      where: {
+        deletionRequestStatus: 'PENDING',
+        role: 'EXTRA',
+        extraProfile: { productions: { some: { id: productionId } } },
+      },
       select: {
         id: true,
         name: true,
@@ -135,8 +167,11 @@ async function listPendingDeletionRequests(req, res) {
 // PATCH /deletion-requests/:id/approve  (admin approves — soft-deletes the account)
 async function approveDeletionRequest(req, res) {
   try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
     const userId = req.params.id;
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await findExtraOnProduction(userId, productionId);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -165,8 +200,11 @@ async function approveDeletionRequest(req, res) {
 // PATCH /deletion-requests/:id/deny  (admin denies — account stays active)
 async function denyDeletionRequest(req, res) {
   try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
     const userId = req.params.id;
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await findExtraOnProduction(userId, productionId);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });

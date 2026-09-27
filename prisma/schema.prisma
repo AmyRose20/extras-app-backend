@@ -44,6 +44,18 @@ enum DeletionRequestedBy {
   ADMIN
 }
 
+model Production {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g. "Wednesday season 3"
+  createdAt DateTime @default(now())
+
+  coordinators User[]         // admins tied to this production
+  extras       ExtraProfile[] // extras available to this production
+  shootDays    ShootDay[]
+
+  @@map("productions")
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -58,8 +70,8 @@ model User {
 
   // Only populated when role == ADMIN
   shootDaysCreated ShootDay[]
-
-  @@map("users")
+  productionId     String?
+  production       Production? @relation(fields: [productionId], references: [id])
 
   deletionRequestStatus     DeletionRequestStatus @default(NONE)
   deletionRequestedAt       DateTime?
@@ -68,6 +80,8 @@ model User {
   deletionReviewedAt        DateTime?
   deletionReviewedByAdminId String?
   deletedAt                 DateTime?
+
+  @@map("users")
 }
 
 model ExtraProfile {
@@ -88,18 +102,20 @@ model ExtraProfile {
   fcmToken     String?
 
   invites      CallInvite[]
+  productions  Production[]
 
   @@map("extra_profiles")
 }
 
 model ShootDay {
-  id              String   @id @default(uuid())
-  productionName  String
+  id              String     @id @default(uuid())
+  productionId    String
+  production      Production @relation(fields: [productionId], references: [id])
   date            DateTime
   location        String
   createdById     String
-  createdBy       User     @relation(fields: [createdById], references: [id])
-  createdAt       DateTime @default(now())
+  createdBy       User       @relation(fields: [createdById], references: [id])
+  createdAt       DateTime   @default(now())
 
   callRequests    CallRequest[]
 
