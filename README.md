@@ -22,6 +22,7 @@ based on firsthand experience working as a film extra.
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
+🔄 Phase 3 in progress — multi-production support and new features. Part 1 (Productions) complete.
 
 ## Screenshots
 
@@ -37,7 +38,7 @@ push notifications, live status dashboard, edge case handling, seed data).
 |---|
 | ![Push notification](screenshots/call%20request%20notification%20-%20extra.png) |
 
-🔄 Phase 2 in progress — polished UI/UX pass + new features, tackled part-by-part.
+**Phase 2 details** — polished UI/UX pass + new features, tackled part-by-part.
 Part 1 (extra profile edit + mandatory face/full-body photo upload, secured via
 Firebase Storage) is complete, including visual styling — chip-based skill/language
 selection, a restricted gender dropdown, a boxed card layout, and contact info fields.
@@ -74,7 +75,18 @@ login screen with its own background artwork, and a dark "dusk" gradient
 theme with glass-style cards and gold accents applied to every other screen)
 is also complete.
 
-🔜 Phase 3 — the final project phase, up next. Details coming soon.
+**Phase 3 details** — the final project phase, tackled part-by-part.
+Part 1 (Productions) is complete: the app now supports multiple productions
+("Wednesday season 3" and "Bloodaxe season 2"). Each coordinator belongs to one
+production and only sees that production's shoot days, call requests and extras;
+extras can be on one or both, and matching only invites extras linked to that
+production. Activity tallies are per-production for coordinators. Extras can add or
+remove productions from their profile (they must keep at least one, and can't leave
+a production they're booked on), and coordinators can remove an extra from their
+own production without affecting the extra's account — any affected invites are
+marked expired so it doesn't count against the extra. Also added: an app-wide
+themed confirmation dialog, screen-specific actions in the hamburger menu, a
+restyled profile edit screen, and a status-bar/safe-area fix across all screens.
 
 ## Getting started
 
@@ -101,6 +113,7 @@ is also complete.
    ```
 
 ## API overview
+All admin routes are scoped to the coordinator's own production.
 
 | Method | Route                  | Who   | Description                              |
 |--------|-------------------------|-------|-------------------------------------------|
@@ -108,9 +121,14 @@ is also complete.
 | POST   | `/auth/login`          | Any   | Log in, get a JWT                         |
 | GET    | `/profiles/me`         | Extra | View your own profile                     |
 | PATCH  | `/profiles/me`         | Extra | Update your own profile, including face/full-body photo     |
+| PATCH  | `/profiles/me/productions` | Extra | Set which productions you're on (must keep one; blocked if booked on an upcoming shoot) |
+| GET    | `/profiles`            | Admin | List extras on your production (filter by skill, gender, availability, age) |
+| GET    | `/profiles/:id`        | Admin | View an extra's full profile (your production only) |
+| DELETE | `/profiles/:id/production` | Admin | Remove an extra from your production; their upcoming invites for it become expired |
+| GET    | `/productions`         | Any   | List all productions                      |
 | POST   | `/shoot-days`          | Admin | Create a shoot day                        |
 | POST   | `/shoot-days/bulk`     | Admin | Create several shoot days at once for one production (blocks duplicate dates within the same production) |
-| GET    | `/shoot-days`          | Admin | List all shoot days                       |
+| GET    | `/shoot-days`          | Admin | List your production's shoot days         |
 | GET    | `/shoot-days/:id`      | Admin | View a shoot day plus its call requests   |
 | PATCH  | `/shoot-days/:id`      | Admin | Edit a shoot day's date/time (notifies extras with an accepted invite; blocked if the new date collides with another shoot day for the same production) |
 | POST   | `/call-requests`       | Admin | Create a call, auto-matches eligible extras |
@@ -119,7 +137,7 @@ is also complete.
 | GET    | `/invites/me`          | Extra | View your invites                         |
 | PATCH  | `/invites/:id`         | Extra | Accept, decline, or cancel (after accepting) an invite |
 | GET    | `/invites/tally/me`    | Extra | View your own lifetime worked/declined/cancelled tally |
-| GET    | `/invites/tally/:extraProfileId` | Admin | View any extra's lifetime tally + 3-strikes flag |
+| GET    | `/invites/tally/:extraProfileId` | Admin | View an extra's tally + 3-strikes flag for your production |
 | POST   | `/deletion-requests/me`          | Extra | Request your own account be deleted        |
 | DELETE | `/deletion-requests/me`          | Extra | Cancel your own pending deletion request    |
 | POST   | `/deletion-requests/:id`         | Admin | Initiate a deletion request for an extra    |
@@ -129,11 +147,12 @@ is also complete.
 
 ## Data model
 
-- `users` — accounts, either ADMIN (coordinator) or EXTRA; tracks an optional
-  pending deletion request (self- or admin-initiated) and a soft-delete flag
-  once one is approved
+- `productions` — e.g. "Wednesday season 3"; everything an admin sees is scoped to one
+- `users` — accounts, either ADMIN (coordinator, belongs to one production) or EXTRA;
+  tracks an optional pending deletion request (self- or admin-initiated) and a
+  soft-delete flag once one is approved
 - `extra_profiles` — age, gender, height, skills, languages, phone/contact email,
-  availability, photo
+  availability, photos; linked to one or more productions
 - `shoot_days` — a production's shoot day (date, location)
 - `call_requests` — a need for a shoot day, with matching criteria (age
   range, gender, skills) and quantity needed
@@ -181,7 +200,19 @@ See `prisma/schema.prisma` for the full schema.
   - [x] UI polish
 
 ## Roadmap — Phase 3 (final project phase)
-- [ ] Details coming soon
+## Roadmap — Phase 3 (final project phase)
+- [x] Part 1 — Productions (coordinators scoped to one production; extras on one or both)
+  - [x] Functionality
+  - [x] UI polish
+- [ ] Part 2 — Meeting point + estimated wrap time
+- [ ] Part 3 — Date of birth (replaces age)
+- [ ] Part 4 — New profile fields (smartphone, encrypted bank details)
+- [ ] Part 5 — Fresh seed data (25 extras with photos)
+- [ ] Part 6 — Name search
+- [ ] Part 7 — Excel export
+- [ ] Part 8 — Email setup + forgot password
+- [ ] Part 9 — Email invites + email notifications for extras without a smartphone
+- [ ] Part 10 — Screenshots of all screens and workflows
 
 ## License
 
