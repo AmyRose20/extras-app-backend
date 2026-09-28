@@ -80,6 +80,10 @@ async function createShootDay(req, res) {
       return res.status(400).json({ error: 'date, meeting point name and address are required' });
     }
 
+    if (new Date(date) < new Date()) {
+      return res.status(400).json({ error: "Shoot days can't be in the past" });
+    }
+
     const wrap = checkWrapTime(date, estimatedWrapAt);
     if (wrap.error) return res.status(400).json({ error: wrap.error });
 
@@ -334,6 +338,9 @@ async function createShootDaysBulk(req, res) {
     for (const day of shootDays) {
       if (!day.date || !day.location?.trim() || !day.locationAddress?.trim()) {
         return res.status(400).json({ error: 'Each shoot day needs a date, meeting point name and address' });
+      }
+      if (new Date(day.date) < new Date()) {
+        return res.status(400).json({ error: `${formatDateForMessage(day.date)}: shoot days can't be in the past` });
       }
       const wrap = checkWrapTime(day.date, day.estimatedWrapAt);
       if (wrap.error) {

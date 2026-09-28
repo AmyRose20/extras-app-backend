@@ -213,4 +213,82 @@ async function updateCallRequest(req, res) {
   }
 }
 
-module.exports = { createCallRequest, getCallRequestStatus, updateCallRequest };
+// POST /call-requests/:id/copy — ADMIN copies a call request to other shoot days.
+// body: { "shootDayIds": ["...", "..."] }
+// Each chosen shoot day gets its own call request with the same description,
+// quantity and criteria; matching runs and invites/push go out for each one.
+// Only upcoming shoot days in the coordinator's own production are allowed.
+async function copyCallRequest(req, res) {
+  try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
+    const { id } = req.params;
+    const { shootDayIds } = req.body;
+
+    if (!Array.isArray(shootDayIds) || shootDayIds.length === 0) {
+      return res.status(400).json({ error: 'Choose at least one shoot day to copy to' });
+    }
+
+    // The call request being copied (must be on this coordinator's production)
+    const source = await prisma.callRequest.findFirst({
+      where: { id, shootDay: { productionId } },
+    });
+    if (!source) {
+      return res.status(404).json({ error: 'Call request not found' });
+    }
+
+    if (shootDayIds.includes(source.shootDayId)) {
+      return res.status(400).json({ error: "You can't copy a call request to the shoot day it's already on" });
+    }
+
+    // Every target must be an upcoming shoot day on this production
+    const targets = await prisma.shootDay.findMany({
+      where: { id: { in: shootDayIds }, productionId, date: { gt: new Date() } },
+      orderBy: { date: 'asc' },
+    });
+    if (targets.length !== shootDayIds.length) {
+      return res.status(400).json({ error: 'One or more shoot days were not found or have already passed' });
+    }
+
+    // Create a copy on each shoot day, then match + invite + notify, one day at a time
+    const results = [];
+    for (const shootDay of targets) {
+      const copy = await prisma.callRequest.create({
+        data: {
+          shootDayId: shootDay.id,
+          description: source.description,
+          quantityNeeded: source.quantityNeeded,
+          criteria: source.criteria,
+        },
+      });
+
+      const matchedExtras = await findMatchingExtras(source.criteria, productionId);
+
+      if (matchedExtras.length > 0) {
+        await prisma.callInvite.createMany({
+          data: matchedExtras.map((extra) => ({
+            callRequestId: copy.id,
+            extraProfileId: extra.id,
+          })),
+          skipDuplicates: true,
+        });
+        await sendPushNotifications(matchedExtras, copy);
+      }
+
+      results.push({
+        callRequestId: copy.id,
+        shootDayId: shootDay.id,
+        date: shootDay.date,
+        matchedCount: matchedExtras.length,
+      });
+    }
+
+    return res.status(201).json({ copied: results });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Something went wrong copying that call request' });
+  }
+}
+
+module.exports = { createCallRequest, getCallRequestStatus, updateCallRequest, copyCallRequest };
