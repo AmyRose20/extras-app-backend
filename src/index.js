@@ -11,6 +11,7 @@ const deletionRequestRoutes = require('./routes/deletionRequest.routes');
 const productionRoutes = require('./routes/production.routes');
 const locationRoutes = require('./routes/location.routes');
 const geocodeRoutes = require('./routes/geocode.routes');
+const placesRoutes = require('./routes/places.routes');
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use('/deletion-requests', deletionRequestRoutes);
 app.use('/productions', productionRoutes);
 app.use('/locations', locationRoutes);
 app.use('/geocode', geocodeRoutes);
+app.use('/places', placesRoutes);
 
 // Basic 404 handler
 app.use((req, res) => {
