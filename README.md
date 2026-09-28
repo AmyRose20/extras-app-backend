@@ -17,12 +17,14 @@ based on firsthand experience working as a film extra.
 - **Push notifications:** Firebase Cloud Messaging
 - **Photo storage:** Firebase Storage — uploaded directly from the mobile app, secured
   per-user via a Firebase custom auth token issued by the backend at login
+- **Maps:** Google Maps Platform — Maps SDK (in-app map), Places API (search) and
+  Geocoding API (pin → address), the last two called server-side so the key stays private
 
 ## Status
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
-🔄 Phase 3 in progress — multi-production support and new features. Part 1 (Productions) complete.
+🔄 Phase 3 in progress — Parts 1–2 complete (multi-production support; meeting points, wrap time + Google Maps).
 
 ## Screenshots
 
@@ -38,55 +40,57 @@ push notifications, live status dashboard, edge case handling, seed data).
 |---|
 | ![Push notification](screenshots/call%20request%20notification%20-%20extra.png) |
 
-**Phase 2 details** — polished UI/UX pass + new features, tackled part-by-part.
-Part 1 (extra profile edit + mandatory face/full-body photo upload, secured via
-Firebase Storage) is complete, including visual styling — chip-based skill/language
-selection, a restricted gender dropdown, a boxed card layout, and contact info fields.
-Part 2 (admin: view and filter extra profiles) is also complete, including filtering
-by skill, gender, availability, and age range (with a filter-type dropdown and a
-clear-filters option), and a full profile detail view for admins.
-Part 3 (cancel/decline distinction, lifetime worked/declined/cancelled tally, and a 3-strikes cancellation flag
-for admins) is also complete.
-Part 4 (editing an existing shoot day's date/time and a
-call request's description/quantity, new navigation to browse shoot days from the app,
-a drill-down to see exactly who has accepted, declined, cancelled, or not yet responded
-to a call request, and push notifications to extras when a shoot day's date/time
-changes) is also complete.
-Part 5 (bulk shoot day creation — an admin can
-schedule several days for one production in a single batch, each with its
-own date, time, and location) is also complete.
-Part 6 (calendar views for both sides — extras see their accepted shoot
-days marked on a calendar, admins see every shoot day — now embedded
-directly on the Home screen above the buttons, alongside a redesigned
-Home screen that merges shoot day creation into a single "Add Shoot Days"
-button, groups the admin's buttons under Schedule/Casting headings, and
-adds a hamburger menu on every screen for quick navigation home or
-logging out) is also complete, along with protection against creating or
-editing a shoot day onto a date the same production already has booked.
-Part 7 (profile deletion request/approval flow) is also complete: an extra can
-request their own account be deleted — or cancel that request — from the
-hamburger menu, and an admin can also initiate a deletion request from an
-extra's profile detail screen. Admins review all pending requests from a
-dedicated Deletion Requests screen, where they can approve (soft-deletes the
-account: blocks login and excludes the extra from future call-request
-matching, while keeping their historical invite/tally data intact) or deny.
-Part 8 (a consistent visual theme applied across the entire app — a custom
-login screen with its own background artwork, and a dark "dusk" gradient
-theme with glass-style cards and gold accents applied to every other screen)
-is also complete.
+**Phase 2 details** — UI/UX polish + new features, tackled part-by-part.
+
+**Part 1 – Extra profile + photos ✅**
+- Profile editing with mandatory face/full-body photos, secured via Firebase Storage
+- Chip-based skills/languages, contact info fields, card layout
+
+**Part 2 – Browse extras (admin) ✅**
+- Filter extras by skill, gender, availability and age range; full profile detail view
+ 
+**Part 3 – Cancel vs decline + activity tally ✅**
+- Declining (never accepted) tracked separately from cancelling (backed out)
+- Worked/declined/cancelled tally for both sides, plus a 3-strikes cancellation flag for admins
+- 
+**Part 4 – Editing + responses ✅**
+- Edit shoot day date/time and call request details; browse shoot days in the app
+- See exactly who accepted, declined, cancelled or hasn't responded
+- Push notifications to booked extras when a shoot day changes
+- 
+**Part 5 – Bulk shoot days ✅**
+- Schedule several days for a production in one batch, each with its own date, time and location
+- 
+**Part 6 – Calendars + Home redesign ✅**
+- Calendar on Home for both sides (extras: their bookings; admins: every shoot day)
+- Hamburger menu on every screen; blocks double-booking a production on the same date
+- 
+**Part 7 – Account deletion requests ✅**
+- Extras or admins can request deletion; admins approve or deny
+- Approval soft-deletes the account (blocks login and matching, keeps history)
+- 
+**Part 8 – Visual theme ✅**
+- Custom login artwork, and a dark "dusk" gradient theme with glass-style cards and gold accents
 
 **Phase 3 details** — the final project phase, tackled part-by-part.
-Part 1 (Productions) is complete: the app now supports multiple productions
-("Wednesday season 3" and "Bloodaxe season 2"). Each coordinator belongs to one
-production and only sees that production's shoot days, call requests and extras;
-extras can be on one or both, and matching only invites extras linked to that
-production. Activity tallies are per-production for coordinators. Extras can add or
-remove productions from their profile (they must keep at least one, and can't leave
-a production they're booked on), and coordinators can remove an extra from their
-own production without affecting the extra's account — any affected invites are
-marked expired so it doesn't count against the extra. Also added: an app-wide
-themed confirmation dialog, screen-specific actions in the hamburger menu, a
-restyled profile edit screen, and a status-bar/safe-area fix across all screens.
+
+**Part 1 – Productions ✅**
+- Multiple productions ("Wednesday season 3", "Bloodaxe season 2"); each coordinator
+  sees only their own production's shoot days, call requests and extras
+- Extras can be on one or both productions, and can add/remove them from their profile
+- Coordinators can remove an extra from their production; affected invites expire
+  without counting against the extra
+- Also: themed confirmation dialogs, screen-specific hamburger menu actions,
+  safe-area fix across all screens
+
+**Part 2 – Meeting point + wrap time ✅**
+- Saved meeting points per production, or "Other" with a Google Maps picker:
+  search (Places autocomplete) or drop a pin, address filled in automatically
+- Optional estimated wrap time (overnight wraps roll to the next day)
+- Extras see the meeting point, call/wrap times and "Get directions" to the exact pin
+- Google keys split: restricted Android key for the map, server-side key for
+  geocoding and place search
+- Also: pagination, redesigned Create Call Request, copy a call request to other days
 
 ## Getting started
 
@@ -94,8 +98,9 @@ restyled profile edit screen, and a status-bar/safe-area fix across all screens.
    ```
    npm install
    ```
-2. Copy `.env.example` to `.env` and fill in your local PostgreSQL
-   connection string:
+2. Copy `.env.example` to `.env` and fill in your local PostgreSQL connection
+   string, JWT secret and `GOOGLE_GEOCODING_API_KEY` (a Google Cloud key with the
+   Geocoding API and Places API (New) enabled):
    ```
    cp .env.example .env
    ```
@@ -130,7 +135,7 @@ All admin routes are scoped to the coordinator's own production.
 | POST   | `/shoot-days/bulk`     | Admin | Create several shoot days at once for one production (blocks duplicate dates within the same production) |
 | GET    | `/shoot-days`          | Admin | List your production's shoot days         |
 | GET    | `/shoot-days/:id`      | Admin | View a shoot day plus its call requests   |
-| PATCH  | `/shoot-days/:id`      | Admin | Edit a shoot day's date/time (notifies extras with an accepted invite; blocked if the new date collides with another shoot day for the same production) |
+| PATCH  | `/shoot-days/:id`      | Admin | Edit a shoot day's call time, est. wrap time and/or meeting point (notifies accepted extras of what changed; blocks same-day double-booking) |
 | POST   | `/call-requests`       | Admin | Create a call, auto-matches eligible extras |
 | PATCH  | `/call-requests/:id`   | Admin | Edit a call request's description/quantity needed |
 | GET    | `/call-requests/:id`   | Admin | See invite status + accept/decline/cancel tally |
@@ -144,6 +149,12 @@ All admin routes are scoped to the coordinator's own production.
 | GET    | `/deletion-requests`             | Admin | List all pending deletion requests          |
 | PATCH  | `/deletion-requests/:id/approve` | Admin | Approve a request (soft-deletes the account)|
 | PATCH  | `/deletion-requests/:id/deny`    | Admin | Deny a deletion request                     |
+| GET    | `/locations`                  | Admin | Your production's saved meeting points |
+| POST   | `/locations`                  | Admin | Save a meeting point for next time |
+| POST   | `/call-requests/:id/copy`     | Admin | Copy a call request to other upcoming shoot days |
+| GET    | `/geocode/reverse`            | Admin | Turn a map pin into an address (server-side Google key) |
+| GET    | `/places/autocomplete`        | Admin | Place suggestions as you type (server-side Google key) |
+| GET    | `/places/details/:placeId`    | Admin | Exact location + address for a chosen place |
 
 ## Data model
 
@@ -153,7 +164,9 @@ All admin routes are scoped to the coordinator's own production.
   soft-delete flag once one is approved
 - `extra_profiles` — age, gender, height, skills, languages, phone/contact email,
   availability, photos; linked to one or more productions
-- `shoot_days` — a production's shoot day (date, location)
+- `locations` — a production's saved meeting points (name, address, optional map pin)
+- `shoot_days` — a production's shoot day: call date/time, optional estimated wrap time,
+  and meeting point (name, address, optional map pin)
 - `call_requests` — a need for a shoot day, with matching criteria (age
   range, gender, skills) and quantity needed
 - `call_invites` — the link between a call request and a matched extra,
@@ -170,7 +183,7 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 5 — Extra-side UI: profile + invite list
 - [x] Part 6 — Coordinator UI + Firebase push notifications
 - [x] Part 7 — Live accept/decline dashboard, edge cases
-- [x] Part 8 — Polish, seed data, deploy, demo GIF
+- [x] Part 8 — Polish, seed data, demo GIF (deployment planned later)
 
 ## Roadmap — Phase 2 (UI polish + new features)
 - [x] Part 1 — Extra profile edit + mandatory face/full-body photo upload (Firebase
@@ -200,11 +213,12 @@ See `prisma/schema.prisma` for the full schema.
   - [x] UI polish
 
 ## Roadmap — Phase 3 (final project phase)
-## Roadmap — Phase 3 (final project phase)
 - [x] Part 1 — Productions (coordinators scoped to one production; extras on one or both)
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 2 — Meeting point + estimated wrap time
+- [x] Part 2 — Meeting point, estimated wrap time + map
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 3 — Date of birth (replaces age)
 - [ ] Part 4 — New profile fields (smartphone, encrypted bank details)
 - [ ] Part 5 — Fresh seed data (25 extras with photos)
@@ -212,7 +226,8 @@ See `prisma/schema.prisma` for the full schema.
 - [ ] Part 7 — Excel export
 - [ ] Part 8 — Email setup + forgot password
 - [ ] Part 9 — Email invites + email notifications for extras without a smartphone
-- [ ] Part 10 — Screenshots of all screens and workflows
+- [ ] Part 10 — Code reorganisation (hooks/navigation, API layer, shared theme + components)
+- [ ] Part 11 — Screenshots of all screens and workflows
 
 ## License
 
@@ -226,6 +241,3 @@ MIT
   included in matching.
 - **SMS fallback** — for profiles without app access, send an SMS (via Twilio) instead
   of a push notification when matched, with a simple YES/NO reply to accept/decline.
-- **Manual invite status** — allow an admin to manually mark an invite as
-  accepted/declined on someone's behalf, for cases where they were contacted by phone
-  the traditional way.
