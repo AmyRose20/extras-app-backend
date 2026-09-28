@@ -52,8 +52,23 @@ model Production {
   coordinators User[]         // admins tied to this production
   extras       ExtraProfile[] // extras available to this production
   shootDays    ShootDay[]
+  locations    Location[]
 
   @@map("productions")
+}
+
+// A saved meeting point for a production, e.g. "Ashford Studios - Phase 1"
+model Location {
+  id           String     @id @default(uuid())
+  name         String
+  address      String
+  latitude     Float?     // optional, for a future map/pin-drop upgrade
+  longitude    Float?
+  productionId String
+  production   Production @relation(fields: [productionId], references: [id])
+  createdAt    DateTime   @default(now())
+
+  @@map("locations")
 }
 
 model User {
@@ -113,6 +128,10 @@ model ShootDay {
   production      Production @relation(fields: [productionId], references: [id])
   date            DateTime
   location        String
+  locationAddress String?   // full address of the meeting point
+  latitude        Float?    // optional, for a future map/pin-drop upgrade
+  longitude       Float?
+  estimatedWrapAt DateTime? // optional estimated wrap time
   createdById     String
   createdBy       User       @relation(fields: [createdById], references: [id])
   createdAt       DateTime   @default(now())

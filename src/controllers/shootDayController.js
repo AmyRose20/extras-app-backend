@@ -5,6 +5,9 @@ const { getMessaging } = require('firebase-admin/messaging');
 // Include this on shoot day queries so responses carry the production's name.
 const PRODUCTION_SELECT = { select: { id: true, name: true } };
 
+const HOUR = 60 * 60 * 1000;
+const MAX_WRAP_HOURS = 24;
+
 // A key that identifies a calendar date regardless of the time portion,
 // so two shoot days on the same day but different times still count as
 // a clash.
@@ -22,6 +25,12 @@ function formatDateForMessage(date) {
   return `${day}-${month}-${year}`;
 }
 
+// HH:MM (24-hour)
+function formatTimeForMessage(date) {
+  const d = new Date(date);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 // Every coordinator must be linked to a production. Returns the
 // productionId, or sends a 403 and returns null if they aren't linked.
 function requireProduction(req, res) {
@@ -32,24 +41,55 @@ function requireProduction(req, res) {
   return req.user.productionId;
 }
 
+// Checks an estimated wrap time against the call time.
+// wrapInput: undefined = not provided, null/'' = clear it, otherwise a date string.
+// The app works out overnight wraps (e.g. 18:00 call, 04:00 wrap -> next day)
+// and sends the full date/time; here we just check it makes sense.
+// Returns { value } or { error }.
+function checkWrapTime(callDate, wrapInput) {
+  if (wrapInput === undefined) return { value: undefined };
+  if (wrapInput === null || wrapInput === '') return { value: null };
+
+  const call = new Date(callDate);
+  const wrap = new Date(wrapInput);
+
+  if (isNaN(wrap.getTime())) {
+    return { error: 'Estimated wrap time is not a valid date/time' };
+  }
+  if (wrap <= call) {
+    return { error: 'Estimated wrap time must be after the call time' };
+  }
+  if (wrap - call > MAX_WRAP_HOURS * HOUR) {
+    return { error: `Estimated wrap time must be within ${MAX_WRAP_HOURS} hours of the call time` };
+  }
+  return { value: wrap };
+}
+
 // POST /shoot-days — ADMIN creates a new shoot day for THEIR production
-// body: { "date": "...", "location": "..." }
+// body: { "date": "...", "location": "Ashford Studios - Phase 1",
+//         "locationAddress": "Ballyhenry, Ashford, Co. Wicklow",
+//         "estimatedWrapAt": "..." (optional) }
 async function createShootDay(req, res) {
   try {
     const productionId = requireProduction(req, res);
     if (!productionId) return;
 
-    const { date, location } = req.body;
+    const { date, location, locationAddress, estimatedWrapAt } = req.body;
 
-    if (!date || !location) {
-      return res.status(400).json({ error: 'date and location are required' });
+    if (!date || !location?.trim() || !locationAddress?.trim()) {
+      return res.status(400).json({ error: 'date, meeting point name and address are required' });
     }
+
+    const wrap = checkWrapTime(date, estimatedWrapAt);
+    if (wrap.error) return res.status(400).json({ error: wrap.error });
 
     const shootDay = await prisma.shootDay.create({
       data: {
         productionId,
         date: new Date(date),
-        location,
+        location: location.trim(),
+        locationAddress: locationAddress.trim(),
+        estimatedWrapAt: wrap.value ?? null,
         createdById: req.user.userId,
       },
       include: { production: PRODUCTION_SELECT },
@@ -95,7 +135,6 @@ async function getShootDay(req, res) {
 
     const { id } = req.params;
 
-    // findFirst (not findUnique) so we can filter on productionId as well as id
     const shootDay = await prisma.shootDay.findFirst({
       where: { id, productionId },
       include: { callRequests: true, production: PRODUCTION_SELECT },
@@ -115,20 +154,21 @@ async function getShootDay(req, res) {
   }
 }
 
-// PATCH /shoot-days/:id — ADMIN edits a shoot day's date/time.
-// Blocked once the shoot day has already passed, and the new
-// date/time can't itself be in the past.
-// body: { "date": "2026-10-01T18:00:00.000Z" }
+// PATCH /shoot-days/:id — ADMIN edits a shoot day. Every field is optional:
+// body: { "date": "...", "estimatedWrapAt": "..." | null,
+//         "location": "...", "locationAddress": "..." }
+// Blocked once the shoot day has already passed. Extras with an ACCEPTED
+// invite are notified of whatever actually changed.
 async function updateShootDay(req, res) {
   try {
     const productionId = requireProduction(req, res);
     if (!productionId) return;
 
     const { id } = req.params;
-    const { date } = req.body;
+    const { date, estimatedWrapAt, location, locationAddress } = req.body;
 
-    if (!date) {
-      return res.status(400).json({ error: 'date is required' });
+    if ([date, estimatedWrapAt, location, locationAddress].every((v) => v === undefined)) {
+      return res.status(400).json({ error: 'Nothing to update' });
     }
 
     const shootDay = await prisma.shootDay.findFirst({
@@ -143,35 +183,87 @@ async function updateShootDay(req, res) {
       return res.status(400).json({ error: 'This shoot day has already passed and can no longer be edited' });
     }
 
-    const newDate = new Date(date);
-    if (newDate < new Date()) {
-      return res.status(400).json({ error: 'The new date/time cannot be in the past' });
+    const data = {};     // what we'll actually save
+    const changes = [];  // human-readable list for the push notification
+
+    // ----- Call date/time -----
+    let callDate = new Date(shootDay.date);
+    if (date !== undefined) {
+      const newDate = new Date(date);
+      if (newDate < new Date()) {
+        return res.status(400).json({ error: 'The new date/time cannot be in the past' });
+      }
+
+      // Same production can't have two shoot days on the same calendar date
+      const otherShootDays = await prisma.shootDay.findMany({
+        where: { productionId, id: { not: shootDay.id } },
+        select: { date: true },
+      });
+      const newDayKey = toDayKey(newDate);
+      if (otherShootDays.some((d) => toDayKey(d.date) === newDayKey)) {
+        return res.status(400).json({
+          error: `${shootDay.production.name} already has a shoot day on ${formatDateForMessage(newDate)}`,
+        });
+      }
+
+      if (newDate.getTime() !== callDate.getTime()) {
+        data.date = newDate;
+        changes.push(`new call time ${formatDateForMessage(newDate)} ${formatTimeForMessage(newDate)}`);
+      }
+      callDate = newDate;
     }
 
-    // Same production can't have two shoot days on the same calendar date
-    const otherShootDays = await prisma.shootDay.findMany({
-      where: {
-        productionId,
-        id: { not: shootDay.id },
-      },
-      select: { date: true },
-    });
-    const newDayKey = toDayKey(newDate);
-    const conflict = otherShootDays.some((d) => toDayKey(d.date) === newDayKey);
+    // ----- Estimated wrap time -----
+    if (estimatedWrapAt !== undefined) {
+      const wrap = checkWrapTime(callDate, estimatedWrapAt);
+      if (wrap.error) return res.status(400).json({ error: wrap.error });
+      data.estimatedWrapAt = wrap.value;
+    } else if (data.date && shootDay.estimatedWrapAt) {
+      // Call time moved but no new wrap sent: keep the same length of day
+      const shift = callDate.getTime() - new Date(shootDay.date).getTime();
+      data.estimatedWrapAt = new Date(new Date(shootDay.estimatedWrapAt).getTime() + shift);
+    }
 
-    if (conflict) {
-      return res.status(400).json({
-        error: `${shootDay.production.name} already has a shoot day on ${formatDateForMessage(newDate)}`,
-      });
+    if ('estimatedWrapAt' in data) {
+      const oldWrap = shootDay.estimatedWrapAt ? new Date(shootDay.estimatedWrapAt).getTime() : null;
+      const newWrap = data.estimatedWrapAt ? data.estimatedWrapAt.getTime() : null;
+      if (oldWrap !== newWrap) {
+        changes.push(newWrap ? `est. wrap ${formatTimeForMessage(data.estimatedWrapAt)}` : 'wrap time removed');
+      } else {
+        delete data.estimatedWrapAt; // no real change
+      }
+    }
+
+    // ----- Meeting point -----
+    if (location !== undefined || locationAddress !== undefined) {
+      const newName = (location ?? shootDay.location ?? '').trim();
+      const newAddress = (locationAddress ?? shootDay.locationAddress ?? '').trim();
+
+      if (!newName || !newAddress) {
+        return res.status(400).json({ error: 'Meeting point needs a name and an address' });
+      }
+
+      if (newName !== shootDay.location || newAddress !== (shootDay.locationAddress ?? '')) {
+        data.location = newName;
+        data.locationAddress = newAddress;
+        changes.push(`meeting point: ${newName}`);
+      }
+    }
+
+    // Nothing actually changed — just send the shoot day back
+    if (Object.keys(data).length === 0) {
+      return res.json(shootDay);
     }
 
     const updated = await prisma.shootDay.update({
       where: { id },
-      data: { date: newDate },
+      data,
       include: { production: PRODUCTION_SELECT },
     });
 
-    await sendShootDayUpdateNotifications(updated);
+    if (changes.length > 0) {
+      await sendShootDayUpdateNotifications(updated, changes);
+    }
 
     return res.json(updated);
   } catch (err) {
@@ -180,9 +272,9 @@ async function updateShootDay(req, res) {
   }
 }
 
-// Notify every extra with an ACCEPTED invite on this shoot day that its
-// date/time has changed. Expects shootDay to include production.
-async function sendShootDayUpdateNotifications(shootDay) {
+// Notify every extra with an ACCEPTED invite on this shoot day about what changed.
+// Expects shootDay to include production.
+async function sendShootDayUpdateNotifications(shootDay, changes) {
   try {
     const acceptedInvites = await prisma.callInvite.findMany({
       where: {
@@ -203,7 +295,7 @@ async function sendShootDayUpdateNotifications(shootDay) {
     const message = {
       notification: {
         title: 'Shoot day updated',
-        body: `${shootDay.production.name} has a new date/time: ${formatDateForMessage(shootDay.date)}`,
+        body: `${shootDay.production.name} (${formatDateForMessage(shootDay.date)}) updated: ${changes.join(', ')}`,
       },
       tokens,
     };
@@ -216,11 +308,14 @@ async function sendShootDayUpdateNotifications(shootDay) {
 }
 
 // POST /shoot-days/bulk — ADMIN creates several shoot days at once for
-// THEIR production. Each day can have its own date/time and location.
+// THEIR production. Each day has its own date/time, meeting point and
+// optional wrap time.
 // body: {
 //   "shootDays": [
-//     { "date": "2026-09-22T08:00:00.000Z", "location": "Riverside Studios" },
-//     { "date": "2026-09-23T09:30:00.000Z", "location": "Downtown Lot" }
+//     { "date": "...", "location": "Ashford Studios - Phase 1",
+//       "locationAddress": "Ballyhenry, Ashford, Co. Wicklow",
+//       "estimatedWrapAt": "..." },
+//     ...
 //   ]
 // }
 async function createShootDaysBulk(req, res) {
@@ -234,10 +329,17 @@ async function createShootDaysBulk(req, res) {
       return res.status(400).json({ error: 'A non-empty shootDays array is required' });
     }
 
+    // Validate every day (and its wrap time) before creating anything
+    const checkedWraps = [];
     for (const day of shootDays) {
-      if (!day.date || !day.location) {
-        return res.status(400).json({ error: 'Each shoot day needs a date and a location' });
+      if (!day.date || !day.location?.trim() || !day.locationAddress?.trim()) {
+        return res.status(400).json({ error: 'Each shoot day needs a date, meeting point name and address' });
       }
+      const wrap = checkWrapTime(day.date, day.estimatedWrapAt);
+      if (wrap.error) {
+        return res.status(400).json({ error: `${formatDateForMessage(day.date)}: ${wrap.error}` });
+      }
+      checkedWraps.push(wrap.value ?? null);
     }
 
     // Look up the production's name for error messages
@@ -270,12 +372,14 @@ async function createShootDaysBulk(req, res) {
     }
 
     const created = await prisma.$transaction(
-      shootDays.map((day) =>
+      shootDays.map((day, index) =>
         prisma.shootDay.create({
           data: {
             productionId,
             date: new Date(day.date),
-            location: day.location,
+            location: day.location.trim(),
+            locationAddress: day.locationAddress.trim(),
+            estimatedWrapAt: checkedWraps[index],
             createdById: req.user.userId,
           },
           include: { production: PRODUCTION_SELECT },

@@ -9,6 +9,7 @@ const callInviteRoutes = require('./routes/callInvite.routes');
 const shootDayRoutes = require('./routes/shootDay.routes');
 const deletionRequestRoutes = require('./routes/deletionRequest.routes');
 const productionRoutes = require('./routes/production.routes');
+const locationRoutes = require('./routes/location.routes');
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use('/invites', callInviteRoutes);
 app.use('/shoot-days', shootDayRoutes);
 app.use('/deletion-requests', deletionRequestRoutes);
 app.use('/productions', productionRoutes);
+app.use('/locations', locationRoutes);
 
 // Basic 404 handler
 app.use((req, res) => {

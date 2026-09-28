@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 const SALT_ROUNDS = 10;
 const DAY = 24 * 60 * 60 * 1000;
+const HOUR = 60 * 60 * 1000;
 
 async function main() {
   // ----- Clean out old data (order matters because of relations) -----
@@ -11,6 +12,7 @@ async function main() {
   await prisma.callRequest.deleteMany();
   await prisma.shootDay.deleteMany();
   await prisma.user.deleteMany(); // also deletes extra profiles (onDelete: Cascade)
+  await prisma.location.deleteMany();
   await prisma.production.deleteMany();
 
   const password = await bcrypt.hash('password123', SALT_ROUNDS);
@@ -21,6 +23,23 @@ async function main() {
   });
   const bloodaxe = await prisma.production.create({
     data: { name: 'Bloodaxe season 2' },
+  });
+
+    // ----- Saved meeting points (one studio per production) -----
+  const ashfordPhase1 = await prisma.location.create({
+    data: {
+      name: 'Ashford Studios - Phase 1',
+      address: 'Ballyhenry, Ashford, Co. Wicklow',
+      productionId: wednesday.id,
+    },
+  });
+
+  const ashfordPhase2 = await prisma.location.create({
+    data: {
+      name: 'Ashford Studios - Phase 2',
+      address: 'Trinity, Co. Wicklow',
+      productionId: bloodaxe.id,
+    },
   });
 
   // ----- Coordinators (one per production) -----
@@ -87,29 +106,38 @@ async function main() {
     extra.extraProfile.productions.some((p) => p.id === production.id);
 
   // ----- Shoot days -----
+    // ----- Shoot days -----
+  // Wednesday: at the saved studio, with an estimated wrap time
   const wednesdayUpcoming = await prisma.shootDay.create({
     data: {
       productionId: wednesday.id,
       date: new Date(Date.now() + 7 * DAY), // 1 week from now
-      location: 'Riverside Studios',
+      estimatedWrapAt: new Date(Date.now() + 7 * DAY + 11 * HOUR), // ~11 hour day
+      location: ashfordPhase1.name,
+      locationAddress: ashfordPhase1.address,
       createdById: wednesdayAdmin.id,
     },
   });
 
+  // Wednesday: last week, at the studio, no wrap time set (it's optional)
   const wednesdayPast = await prisma.shootDay.create({
     data: {
       productionId: wednesday.id,
       date: new Date(Date.now() - 7 * DAY), // 1 week ago
-      location: 'Old Backlot',
+      location: ashfordPhase1.name,
+      locationAddress: ashfordPhase1.address,
       createdById: wednesdayAdmin.id,
     },
   });
 
+  // Bloodaxe: an "Other" location (not the saved studio), e.g. a beach scene
   const bloodaxeUpcoming = await prisma.shootDay.create({
     data: {
       productionId: bloodaxe.id,
       date: new Date(Date.now() + 10 * DAY), // 10 days from now
-      location: 'Harbour Set',
+      estimatedWrapAt: new Date(Date.now() + 10 * DAY + 9 * HOUR),
+      location: 'Brittas Bay beach car park',
+      locationAddress: 'Brittas Bay, Co. Wicklow',
       createdById: bloodaxeAdmin.id,
     },
   });
