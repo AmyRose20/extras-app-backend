@@ -65,6 +65,22 @@ function checkWrapTime(callDate, wrapInput) {
   return { value: wrap };
 }
 
+// Checks an optional map pin. Both missing/null = no pin (fine).
+// Otherwise both must be valid coordinates.
+// Returns { value: { latitude, longitude } } or { error }.
+function checkPin(latitude, longitude) {
+  const missing = (v) => v === undefined || v === null || v === '';
+  if (missing(latitude) && missing(longitude)) {
+    return { value: { latitude: null, longitude: null } };
+  }
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return { error: 'The map pin has invalid coordinates' };
+  }
+  return { value: { latitude: lat, longitude: lng } };
+}
+
 // POST /shoot-days — ADMIN creates a new shoot day for THEIR production
 // body: { "date": "...", "location": "Ashford Studios - Phase 1",
 //         "locationAddress": "Ballyhenry, Ashford, Co. Wicklow",
@@ -74,7 +90,7 @@ async function createShootDay(req, res) {
     const productionId = requireProduction(req, res);
     if (!productionId) return;
 
-    const { date, location, locationAddress, estimatedWrapAt } = req.body;
+    const { date, location, locationAddress, estimatedWrapAt, latitude, longitude } = req.body;
 
     if (!date || !location?.trim() || !locationAddress?.trim()) {
       return res.status(400).json({ error: 'date, meeting point name and address are required' });
@@ -87,6 +103,9 @@ async function createShootDay(req, res) {
     const wrap = checkWrapTime(date, estimatedWrapAt);
     if (wrap.error) return res.status(400).json({ error: wrap.error });
 
+    const pin = checkPin(latitude, longitude);
+    if (pin.error) return res.status(400).json({ error: pin.error });
+
     const shootDay = await prisma.shootDay.create({
       data: {
         productionId,
@@ -94,6 +113,7 @@ async function createShootDay(req, res) {
         location: location.trim(),
         locationAddress: locationAddress.trim(),
         estimatedWrapAt: wrap.value ?? null,
+        ...pin.value, // latitude + longitude (or nulls)
         createdById: req.user.userId,
       },
       include: { production: PRODUCTION_SELECT },
@@ -169,10 +189,45 @@ async function updateShootDay(req, res) {
     if (!productionId) return;
 
     const { id } = req.params;
-    const { date, estimatedWrapAt, location, locationAddress } = req.body;
+    const { date, estimatedWrapAt, location, locationAddress, latitude, longitude } = req.body;
 
-    if ([date, estimatedWrapAt, location, locationAddress].every((v) => v === undefined)) {
-      return res.status(400).json({ error: 'Nothing to update' });
+    // ----- Meeting point (name, address and optional map pin) -----
+    if (
+      location !== undefined ||
+      locationAddress !== undefined ||
+      latitude !== undefined ||
+      longitude !== undefined
+    ) {
+      const newName = (location ?? shootDay.location ?? '').trim();
+      const newAddress = (locationAddress ?? shootDay.locationAddress ?? '').trim();
+
+      if (!newName || !newAddress) {
+        return res.status(400).json({ error: 'Meeting point needs a name and an address' });
+      }
+
+      // Pin: if a pin was sent, use it (null clears it); otherwise keep the existing one
+      let newLat = shootDay.latitude;
+      let newLng = shootDay.longitude;
+      if (latitude !== undefined || longitude !== undefined) {
+        const pin = checkPin(latitude, longitude);
+        if (pin.error) return res.status(400).json({ error: pin.error });
+        newLat = pin.value.latitude;
+        newLng = pin.value.longitude;
+      }
+
+      const changed =
+        newName !== shootDay.location ||
+        newAddress !== (shootDay.locationAddress ?? '') ||
+        newLat !== shootDay.latitude ||
+        newLng !== shootDay.longitude;
+
+      if (changed) {
+        data.location = newName;
+        data.locationAddress = newAddress;
+        data.latitude = newLat;
+        data.longitude = newLng;
+        changes.push(`meeting point: ${newName}`);
+      }
     }
 
     const shootDay = await prisma.shootDay.findFirst({
@@ -335,6 +390,7 @@ async function createShootDaysBulk(req, res) {
 
     // Validate every day (and its wrap time) before creating anything
     const checkedWraps = [];
+    const checkedPins = [];
     for (const day of shootDays) {
       if (!day.date || !day.location?.trim() || !day.locationAddress?.trim()) {
         return res.status(400).json({ error: 'Each shoot day needs a date, meeting point name and address' });
@@ -347,6 +403,11 @@ async function createShootDaysBulk(req, res) {
         return res.status(400).json({ error: `${formatDateForMessage(day.date)}: ${wrap.error}` });
       }
       checkedWraps.push(wrap.value ?? null);
+      const pin = checkPin(day.latitude, day.longitude);
+      if (pin.error) {
+        return res.status(400).json({ error: `${formatDateForMessage(day.date)}: ${pin.error}` });
+      }
+      checkedPins.push(pin.value);
     }
 
     // Look up the production's name for error messages
@@ -387,6 +448,7 @@ async function createShootDaysBulk(req, res) {
             location: day.location.trim(),
             locationAddress: day.locationAddress.trim(),
             estimatedWrapAt: checkedWraps[index],
+            ...checkedPins[index], // latitude + longitude (or nulls)
             createdById: req.user.userId,
           },
           include: { production: PRODUCTION_SELECT },

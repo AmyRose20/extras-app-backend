@@ -42,6 +42,9 @@ async function createLocation(req, res) {
     const name = req.body.name?.trim();
     const address = req.body.address?.trim();
 
+    const latitude = req.body.latitude ?? null;
+    const longitude = req.body.longitude ?? null;
+
     if (!name || !address) {
       return res.status(400).json({ error: 'name and address are required' });
     }
@@ -57,7 +60,7 @@ async function createLocation(req, res) {
     }
 
     const location = await prisma.location.create({
-      data: { name, address, productionId },
+      data: { name, address, latitude, longitude, productionId },
       select,
     });
 
