@@ -30,4 +30,42 @@ async function listMyLocations(req, res) {
   }
 }
 
-module.exports = { listMyLocations };
+// POST /locations — ADMIN saves a new meeting point for THEIR production
+// body: { "name": "Brittas Bay beach car park", "address": "Brittas Bay, Co. Wicklow" }
+// If a location with the same name (ignoring upper/lower case) is already
+// saved for this production, that one is returned instead of a duplicate.
+async function createLocation(req, res) {
+  try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
+    const name = req.body.name?.trim();
+    const address = req.body.address?.trim();
+
+    if (!name || !address) {
+      return res.status(400).json({ error: 'name and address are required' });
+    }
+
+    const select = { id: true, name: true, address: true, latitude: true, longitude: true };
+
+    const existing = await prisma.location.findFirst({
+      where: { productionId, name: { equals: name, mode: 'insensitive' } },
+      select,
+    });
+    if (existing) {
+      return res.json(existing);
+    }
+
+    const location = await prisma.location.create({
+      data: { name, address, productionId },
+      select,
+    });
+
+    return res.status(201).json(location);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Something went wrong saving that location' });
+  }
+}
+
+module.exports = { listMyLocations, createLocation };
