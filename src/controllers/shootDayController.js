@@ -180,7 +180,8 @@ async function getShootDay(req, res) {
 
 // PATCH /shoot-days/:id — ADMIN edits a shoot day. Every field is optional:
 // body: { "date": "...", "estimatedWrapAt": "..." | null,
-//         "location": "...", "locationAddress": "..." }
+//         "location": "...", "locationAddress": "...",
+//         "latitude": 53.0 | null, "longitude": -6.1 | null }
 // Blocked once the shoot day has already passed. Extras with an ACCEPTED
 // invite are notified of whatever actually changed.
 async function updateShootDay(req, res) {
@@ -191,7 +192,75 @@ async function updateShootDay(req, res) {
     const { id } = req.params;
     const { date, estimatedWrapAt, location, locationAddress, latitude, longitude } = req.body;
 
-    // ----- Meeting point (name, address and optional map pin) -----
+    if ([date, estimatedWrapAt, location, locationAddress, latitude, longitude].every((v) => v === undefined)) {
+      return res.status(400).json({ error: 'Nothing to update' });
+    }
+
+    // 1) Load the shoot day FIRST — everything below uses it
+    const shootDay = await prisma.shootDay.findFirst({
+      where: { id, productionId },
+      include: { production: PRODUCTION_SELECT },
+    });
+    if (!shootDay) {
+      return res.status(404).json({ error: 'Shoot day not found' });
+    }
+
+    if (new Date(shootDay.date) < new Date()) {
+      return res.status(400).json({ error: 'This shoot day has already passed and can no longer be edited' });
+    }
+
+    const data = {};     // what we'll actually save
+    const changes = [];  // human-readable list for the push notification
+
+    // 2) Call date/time
+    let callDate = new Date(shootDay.date);
+    if (date !== undefined) {
+      const newDate = new Date(date);
+      if (newDate < new Date()) {
+        return res.status(400).json({ error: 'The new date/time cannot be in the past' });
+      }
+
+      // Same production can't have two shoot days on the same calendar date
+      const otherShootDays = await prisma.shootDay.findMany({
+        where: { productionId, id: { not: shootDay.id } },
+        select: { date: true },
+      });
+      const newDayKey = toDayKey(newDate);
+      if (otherShootDays.some((d) => toDayKey(d.date) === newDayKey)) {
+        return res.status(400).json({
+          error: `${shootDay.production.name} already has a shoot day on ${formatDateForMessage(newDate)}`,
+        });
+      }
+
+      if (newDate.getTime() !== callDate.getTime()) {
+        data.date = newDate;
+        changes.push(`new call time ${formatDateForMessage(newDate)} ${formatTimeForMessage(newDate)}`);
+      }
+      callDate = newDate;
+    }
+
+    // 3) Estimated wrap time
+    if (estimatedWrapAt !== undefined) {
+      const wrap = checkWrapTime(callDate, estimatedWrapAt);
+      if (wrap.error) return res.status(400).json({ error: wrap.error });
+      data.estimatedWrapAt = wrap.value;
+    } else if (data.date && shootDay.estimatedWrapAt) {
+      // Call time moved but no new wrap sent: keep the same length of day
+      const shift = callDate.getTime() - new Date(shootDay.date).getTime();
+      data.estimatedWrapAt = new Date(new Date(shootDay.estimatedWrapAt).getTime() + shift);
+    }
+
+    if ('estimatedWrapAt' in data) {
+      const oldWrap = shootDay.estimatedWrapAt ? new Date(shootDay.estimatedWrapAt).getTime() : null;
+      const newWrap = data.estimatedWrapAt ? data.estimatedWrapAt.getTime() : null;
+      if (oldWrap !== newWrap) {
+        changes.push(newWrap ? `est. wrap ${formatTimeForMessage(data.estimatedWrapAt)}` : 'wrap time removed');
+      } else {
+        delete data.estimatedWrapAt; // no real change
+      }
+    }
+
+    // 4) Meeting point (name, address and optional map pin)
     if (
       location !== undefined ||
       locationAddress !== undefined ||
@@ -230,86 +299,7 @@ async function updateShootDay(req, res) {
       }
     }
 
-    const shootDay = await prisma.shootDay.findFirst({
-      where: { id, productionId },
-      include: { production: PRODUCTION_SELECT },
-    });
-    if (!shootDay) {
-      return res.status(404).json({ error: 'Shoot day not found' });
-    }
-
-    if (new Date(shootDay.date) < new Date()) {
-      return res.status(400).json({ error: 'This shoot day has already passed and can no longer be edited' });
-    }
-
-    const data = {};     // what we'll actually save
-    const changes = [];  // human-readable list for the push notification
-
-    // ----- Call date/time -----
-    let callDate = new Date(shootDay.date);
-    if (date !== undefined) {
-      const newDate = new Date(date);
-      if (newDate < new Date()) {
-        return res.status(400).json({ error: 'The new date/time cannot be in the past' });
-      }
-
-      // Same production can't have two shoot days on the same calendar date
-      const otherShootDays = await prisma.shootDay.findMany({
-        where: { productionId, id: { not: shootDay.id } },
-        select: { date: true },
-      });
-      const newDayKey = toDayKey(newDate);
-      if (otherShootDays.some((d) => toDayKey(d.date) === newDayKey)) {
-        return res.status(400).json({
-          error: `${shootDay.production.name} already has a shoot day on ${formatDateForMessage(newDate)}`,
-        });
-      }
-
-      if (newDate.getTime() !== callDate.getTime()) {
-        data.date = newDate;
-        changes.push(`new call time ${formatDateForMessage(newDate)} ${formatTimeForMessage(newDate)}`);
-      }
-      callDate = newDate;
-    }
-
-    // ----- Estimated wrap time -----
-    if (estimatedWrapAt !== undefined) {
-      const wrap = checkWrapTime(callDate, estimatedWrapAt);
-      if (wrap.error) return res.status(400).json({ error: wrap.error });
-      data.estimatedWrapAt = wrap.value;
-    } else if (data.date && shootDay.estimatedWrapAt) {
-      // Call time moved but no new wrap sent: keep the same length of day
-      const shift = callDate.getTime() - new Date(shootDay.date).getTime();
-      data.estimatedWrapAt = new Date(new Date(shootDay.estimatedWrapAt).getTime() + shift);
-    }
-
-    if ('estimatedWrapAt' in data) {
-      const oldWrap = shootDay.estimatedWrapAt ? new Date(shootDay.estimatedWrapAt).getTime() : null;
-      const newWrap = data.estimatedWrapAt ? data.estimatedWrapAt.getTime() : null;
-      if (oldWrap !== newWrap) {
-        changes.push(newWrap ? `est. wrap ${formatTimeForMessage(data.estimatedWrapAt)}` : 'wrap time removed');
-      } else {
-        delete data.estimatedWrapAt; // no real change
-      }
-    }
-
-    // ----- Meeting point -----
-    if (location !== undefined || locationAddress !== undefined) {
-      const newName = (location ?? shootDay.location ?? '').trim();
-      const newAddress = (locationAddress ?? shootDay.locationAddress ?? '').trim();
-
-      if (!newName || !newAddress) {
-        return res.status(400).json({ error: 'Meeting point needs a name and an address' });
-      }
-
-      if (newName !== shootDay.location || newAddress !== (shootDay.locationAddress ?? '')) {
-        data.location = newName;
-        data.locationAddress = newAddress;
-        changes.push(`meeting point: ${newName}`);
-      }
-    }
-
-    // Nothing actually changed — just send the shoot day back
+    // 5) Nothing actually changed — just send the shoot day back
     if (Object.keys(data).length === 0) {
       return res.json(shootDay);
     }
@@ -331,7 +321,6 @@ async function updateShootDay(req, res) {
   }
 }
 
-// Notify every extra with an ACCEPTED invite on this shoot day about what changed.
 // Expects shootDay to include production.
 async function sendShootDayUpdateNotifications(shootDay, changes) {
   try {
