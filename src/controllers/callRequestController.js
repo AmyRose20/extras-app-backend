@@ -1,6 +1,7 @@
 const prisma = require('../config/db');
 require('../config/firebase'); // initializes the Firebase app
 const { getMessaging } = require('firebase-admin/messaging');
+const { dobFilterForAgeRange } = require('../utils/age');
 
 // Every coordinator must be linked to a production. Returns the
 // productionId, or sends a 403 and returns null if they aren't linked.
@@ -110,10 +111,7 @@ async function findMatchingExtras(criteria, productionId) {
   return prisma.extraProfile.findMany({
     where: {
       productions: { some: { id: productionId } },
-      age: {
-        gte: minAge ?? undefined,
-        lte: maxAge ?? undefined,
-      },
+      dateOfBirth: dobFilterForAgeRange(minAge, maxAge),
       gender: gender ?? undefined,
       skills: skills && skills.length > 0 ? { hasEvery: skills } : undefined,
       user: {

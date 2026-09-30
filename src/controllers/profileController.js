@@ -1,6 +1,7 @@
 require('../config/firebase'); // initializes the Firebase app
 const { getMessaging } = require('firebase-admin/messaging');
 const prisma = require('../config/db');
+const { ageFromDob, dobFilterForAgeRange } = require('../utils/age');
 
 // Every coordinator must be linked to a production. Returns the
 // productionId, or sends a 403 and returns null if they aren't linked.
@@ -31,6 +32,7 @@ async function getMyProfile(req, res) {
   const { user, ...rest } = profile;
   return res.json({
     ...rest,
+    age: ageFromDob(rest.dateOfBirth), // worked out from date of birth
     deletionRequestStatus: user.deletionRequestStatus,
     deletionRequestedAt: user.deletionRequestedAt,
     deletionReason: user.deletionReason,
@@ -39,14 +41,25 @@ async function getMyProfile(req, res) {
 
 // PATCH /profiles/me — an EXTRA updating their own profile
 async function updateMyProfile(req, res) {
-  const { age, gender, heightCm, skills, languages, phoneNumber, contactEmail, availability, facePhotoUrl, fullBodyPhotoUrl } = req.body;
+  const { dateOfBirth, gender, heightCm, skills, languages, phoneNumber, contactEmail, availability, facePhotoUrl, fullBodyPhotoUrl } = req.body;
+
+  // dateOfBirth: undefined = leave as is, null/'' = clear it, otherwise a date like "1997-03-14"
+  let dob;
+  if (dateOfBirth === null || dateOfBirth === '') {
+    dob = null;
+  } else if (dateOfBirth !== undefined) {
+    dob = new Date(dateOfBirth);
+    if (isNaN(dob.getTime()) || dob > new Date() || dob.getFullYear() < 1900) {
+      return res.status(400).json({ error: 'Please enter a valid date of birth' });
+    }
+  }
 
   const updated = await prisma.extraProfile.update({
     where: { userId: req.user.userId },
-    data: { age, gender, heightCm, skills, languages, phoneNumber, contactEmail, availability, facePhotoUrl, fullBodyPhotoUrl },
+    data: { dateOfBirth: dob, gender, heightCm, skills, languages, phoneNumber, contactEmail, availability, facePhotoUrl, fullBodyPhotoUrl },
   });
 
-  return res.json(updated);
+  return res.json({ ...updated, age: ageFromDob(updated.dateOfBirth) });
 }
 
 // PATCH /profiles/me/fcm-token — an EXTRA's device registering its push token
@@ -102,9 +115,10 @@ async function listProfiles(req, res) {
     }
 
     if (minAge || maxAge) {
-      where.age = {};
-      if (minAge) where.age.gte = parseInt(minAge, 10);
-      if (maxAge) where.age.lte = parseInt(maxAge, 10);
+      where.dateOfBirth = dobFilterForAgeRange(
+        minAge ? parseInt(minAge, 10) : null,
+        maxAge ? parseInt(maxAge, 10) : null
+      );
     }
 
     const profiles = await prisma.extraProfile.findMany({
@@ -148,7 +162,12 @@ async function getProfileById(req, res) {
     }
 
     const { user, ...rest } = profile;
-    return res.json({ ...rest, name: user.name, deletionRequestStatus: user.deletionRequestStatus });
+    return res.json({
+      ...rest,
+      age: ageFromDob(rest.dateOfBirth),
+      name: user.name,
+      deletionRequestStatus: user.deletionRequestStatus,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Something went wrong loading that profile' });

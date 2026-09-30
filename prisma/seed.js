@@ -68,11 +68,11 @@ async function main() {
   // ----- Extras -----
   // productions: which production(s) each extra is linked to
   const extrasData = [
-    { email: 'extra1@example.com', name: 'Jordan Lee',   age: 29, gender: 'FEMALE', heightCm: 171, skills: ['Stunt work', 'horse back riding', 'rowing'], availability: ['Everyday'], productions: [wednesday] },
-    { email: 'extra2@example.com', name: 'Sam Rivera',   age: 34, gender: 'MALE',   heightCm: 180, skills: ['sign language', 'martial arts'], availability: ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays'], productions: [wednesday] },
-    { email: 'extra3@example.com', name: 'Priya Nair',   age: 22, gender: 'FEMALE', heightCm: 165, skills: ['dancing'], availability: ['Tuesdays', 'Thursdays'], productions: [bloodaxe] },
-    { email: 'extra4@example.com', name: 'Chris Okafor', age: 41, gender: 'MALE',   heightCm: 175, skills: ['Stunt work', 'boxing'], availability: ['Everyday'], productions: [bloodaxe] },
-    { email: 'extra5@example.com', name: 'Taylor Kim',   age: 27, gender: 'MALE',   heightCm: 168, skills: ['singing', 'sign language', 'Stunt work'], availability: ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays'], productions: [wednesday, bloodaxe] },
+    { email: 'extra1@example.com', name: 'Jordan Lee',   dateOfBirth: '1997-03-14', gender: 'FEMALE', heightCm: 171, skills: ['Stunt work', 'horse back riding', 'rowing'], availability: ['Everyday'], productions: [wednesday] },
+    { email: 'extra2@example.com', name: 'Sam Rivera',   dateOfBirth: '1992-07-02', gender: 'MALE',   heightCm: 180, skills: ['sign language', 'martial arts'], availability: ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays'], productions: [wednesday] },
+    { email: 'extra3@example.com', name: 'Priya Nair',   dateOfBirth: '2004-01-20', gender: 'FEMALE', heightCm: 165, skills: ['dancing'], availability: ['Tuesdays', 'Thursdays'], productions: [bloodaxe] },
+    { email: 'extra4@example.com', name: 'Chris Okafor', dateOfBirth: '1985-06-08', gender: 'MALE',   heightCm: 175, skills: ['Stunt work', 'boxing'], availability: ['Everyday'], productions: [bloodaxe] },
+    { email: 'extra5@example.com', name: 'Taylor Kim',   dateOfBirth: '1999-05-30', gender: 'MALE',   heightCm: 168, skills: ['singing', 'sign language', 'Stunt work'], availability: ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays'], productions: [wednesday, bloodaxe] },
   ];
 
   const extras = [];
@@ -86,7 +86,7 @@ async function main() {
         phone: '555-0101',
         extraProfile: {
           create: {
-            age: data.age,
+            dateOfBirth: new Date(data.dateOfBirth),
             gender: data.gender,
             heightCm: data.heightCm,
             skills: data.skills,

@@ -104,7 +104,7 @@ model ExtraProfile {
   userId       String   @unique
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  age          Int?
+  dateOfBirth  DateTime? @db.Date  // replaces age; age is worked out from this
   gender       Gender?
   heightCm     Int?
   skills       String[] // e.g. ["stunt work", "horse riding", "sign language"]
