@@ -24,7 +24,7 @@ based on firsthand experience working as a film extra.
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
-🔄 Phase 3 in progress — Parts 1–2 complete (multi-production support; meeting points, wrap time + Google Maps).
+🔄 Phase 3 in progress — Parts 1–3 complete (multi-production support; meeting points, wrap time + Google Maps; date of birth).
 
 ## Screenshots
 
@@ -48,27 +48,27 @@ push notifications, live status dashboard, edge case handling, seed data).
 
 **Part 2 – Browse extras (admin) ✅**
 - Filter extras by skill, gender, availability and age range; full profile detail view
- 
+
 **Part 3 – Cancel vs decline + activity tally ✅**
 - Declining (never accepted) tracked separately from cancelling (backed out)
 - Worked/declined/cancelled tally for both sides, plus a 3-strikes cancellation flag for admins
-- 
+
 **Part 4 – Editing + responses ✅**
 - Edit shoot day date/time and call request details; browse shoot days in the app
 - See exactly who accepted, declined, cancelled or hasn't responded
 - Push notifications to booked extras when a shoot day changes
-- 
+
 **Part 5 – Bulk shoot days ✅**
 - Schedule several days for a production in one batch, each with its own date, time and location
-- 
+
 **Part 6 – Calendars + Home redesign ✅**
 - Calendar on Home for both sides (extras: their bookings; admins: every shoot day)
 - Hamburger menu on every screen; blocks double-booking a production on the same date
-- 
+
 **Part 7 – Account deletion requests ✅**
 - Extras or admins can request deletion; admins approve or deny
 - Approval soft-deletes the account (blocks login and matching, keeps history)
-- 
+
 **Part 8 – Visual theme ✅**
 - Custom login artwork, and a dark "dusk" gradient theme with glass-style cards and gold accents
 
@@ -92,30 +92,35 @@ push notifications, live status dashboard, edge case handling, seed data).
   geocoding and place search
 - Also: pagination, redesigned Create Call Request, copy a call request to other days
 
+**Part 3 – Date of birth ✅**
+- Extras enter a date of birth (spinner picker) instead of an age, so their age is always current
+- Age is worked out on the fly for display, the admin age filter and call request matching
+  (age ranges are converted to date-of-birth ranges in the database query)
+
 ## Getting started
 
 1. Install dependencies:
-   ```
+```
    npm install
-   ```
+```
 2. Copy `.env.example` to `.env` and fill in your local PostgreSQL connection
    string, JWT secret and `GOOGLE_GEOCODING_API_KEY` (a Google Cloud key with the
    Geocoding API and Places API (New) enabled):
-   ```
+```
    cp .env.example .env
-   ```
+```
 3. Create the database tables:
-   ```
+```
    npx prisma migrate dev --name init
-   ```
+```
 4. Start the dev server:
-   ```
+```
    npm run dev
-   ```
+```
 5. Check it's running:
-   ```
+```
    curl http://localhost:4000/health
-   ```
+```
 
 ## API overview
 All admin routes are scoped to the coordinator's own production.
@@ -125,7 +130,7 @@ All admin routes are scoped to the coordinator's own production.
 | POST   | `/auth/register`       | Any   | Create an account (ADMIN or EXTRA)        |
 | POST   | `/auth/login`          | Any   | Log in, get a JWT                         |
 | GET    | `/profiles/me`         | Extra | View your own profile                     |
-| PATCH  | `/profiles/me`         | Extra | Update your own profile, including face/full-body photo     |
+| PATCH  | `/profiles/me`         | Extra | Update your own profile (date of birth, photos, skills, etc.) |
 | PATCH  | `/profiles/me/productions` | Extra | Set which productions you're on (must keep one; blocked if booked on an upcoming shoot) |
 | GET    | `/profiles`            | Admin | List extras on your production (filter by skill, gender, availability, age) |
 | GET    | `/profiles/:id`        | Admin | View an extra's full profile (your production only) |
@@ -139,6 +144,7 @@ All admin routes are scoped to the coordinator's own production.
 | POST   | `/call-requests`       | Admin | Create a call, auto-matches eligible extras |
 | PATCH  | `/call-requests/:id`   | Admin | Edit a call request's description/quantity needed |
 | GET    | `/call-requests/:id`   | Admin | See invite status + accept/decline/cancel tally |
+| POST   | `/call-requests/:id/copy`     | Admin | Copy a call request to other upcoming shoot days |
 | GET    | `/invites/me`          | Extra | View your invites                         |
 | PATCH  | `/invites/:id`         | Extra | Accept, decline, or cancel (after accepting) an invite |
 | GET    | `/invites/tally/me`    | Extra | View your own lifetime worked/declined/cancelled tally |
@@ -151,7 +157,6 @@ All admin routes are scoped to the coordinator's own production.
 | PATCH  | `/deletion-requests/:id/deny`    | Admin | Deny a deletion request                     |
 | GET    | `/locations`                  | Admin | Your production's saved meeting points |
 | POST   | `/locations`                  | Admin | Save a meeting point for next time |
-| POST   | `/call-requests/:id/copy`     | Admin | Copy a call request to other upcoming shoot days |
 | GET    | `/geocode/reverse`            | Admin | Turn a map pin into an address (server-side Google key) |
 | GET    | `/places/autocomplete`        | Admin | Place suggestions as you type (server-side Google key) |
 | GET    | `/places/details/:placeId`    | Admin | Exact location + address for a chosen place |
@@ -162,7 +167,7 @@ All admin routes are scoped to the coordinator's own production.
 - `users` — accounts, either ADMIN (coordinator, belongs to one production) or EXTRA;
   tracks an optional pending deletion request (self- or admin-initiated) and a
   soft-delete flag once one is approved
-- `extra_profiles` — age, gender, height, skills, languages, phone/contact email,
+- `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
   availability, photos; linked to one or more productions
 - `locations` — a production's saved meeting points (name, address, optional map pin)
 - `shoot_days` — a production's shoot day: call date/time, optional estimated wrap time,
@@ -219,7 +224,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 2 — Meeting point, estimated wrap time + map
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 3 — Date of birth (replaces age)
+- [x] Part 3 — Date of birth (replaces age)
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 4 — New profile fields (smartphone, encrypted bank details)
 - [ ] Part 5 — Fresh seed data (25 extras with photos)
 - [ ] Part 6 — Name search
