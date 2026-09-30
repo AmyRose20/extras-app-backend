@@ -24,7 +24,7 @@ based on firsthand experience working as a film extra.
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
-🔄 Phase 3 in progress — Parts 1–3 complete (multi-production support; meeting points, wrap time + Google Maps; date of birth).
+🔄 Phase 3 in progress — Parts 1–4 complete (multi-production support; meeting points, wrap time + Google Maps; date of birth; smartphone + encrypted bank details).
 
 ## Screenshots
 
@@ -97,6 +97,13 @@ push notifications, live status dashboard, edge case handling, seed data).
 - Age is worked out on the fly for display, the admin age filter and call request matching
   (age ranges are converted to date-of-birth ranges in the database query)
 
+**Part 4 – Smartphone + bank details ✅**
+- Extras record whether they have a smartphone (used later to choose push vs email invites)
+- IBAN/BIC are checked (IBAN checksum, BIC format), then encrypted with AES-256-GCM before
+  saving; the key lives only in the server's environment
+- Extras only ever see a masked IBAN (`IE•• •••• •••• 5678`); coordinators tap
+  "Show bank details" to reveal them via a separate, logged, admin-only endpoint
+
 ## Getting started
 
 1. Install dependencies:
@@ -105,7 +112,8 @@ push notifications, live status dashboard, edge case handling, seed data).
 ```
 2. Copy `.env.example` to `.env` and fill in your local PostgreSQL connection
    string, JWT secret and `GOOGLE_GEOCODING_API_KEY` (a Google Cloud key with the
-   Geocoding API and Places API (New) enabled):
+   Geocoding API and Places API (New) enabled) and and `BANK_DETAILS_ENCRYPTION_KEY`
+   (64 hex characters — see the command in `.env.example`):
 ```
    cp .env.example .env
 ```
@@ -134,6 +142,7 @@ All admin routes are scoped to the coordinator's own production.
 | PATCH  | `/profiles/me/productions` | Extra | Set which productions you're on (must keep one; blocked if booked on an upcoming shoot) |
 | GET    | `/profiles`            | Admin | List extras on your production (filter by skill, gender, availability, age) |
 | GET    | `/profiles/:id`        | Admin | View an extra's full profile (your production only) |
+| GET    | `/profiles/:id/bank-details` | Admin | Reveal an extra's full IBAN/BIC (decrypted on request, access logged) |
 | DELETE | `/profiles/:id/production` | Admin | Remove an extra from your production; their upcoming invites for it become expired |
 | GET    | `/productions`         | Any   | List all productions                      |
 | POST   | `/shoot-days`          | Admin | Create a shoot day                        |
@@ -167,8 +176,8 @@ All admin routes are scoped to the coordinator's own production.
 - `users` — accounts, either ADMIN (coordinator, belongs to one production) or EXTRA;
   tracks an optional pending deletion request (self- or admin-initiated) and a
   soft-delete flag once one is approved
-- `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
-  availability, photos; linked to one or more productions
+- - `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
+  availability, photos, smartphone yes/no, encrypted IBAN/BIC; linked to one or more productions
 - `locations` — a production's saved meeting points (name, address, optional map pin)
 - `shoot_days` — a production's shoot day: call date/time, optional estimated wrap time,
   and meeting point (name, address, optional map pin)
@@ -227,7 +236,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 3 — Date of birth (replaces age)
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 4 — New profile fields (smartphone, encrypted bank details)
+- [x] Part 4 — New profile fields (smartphone, encrypted bank details)
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 5 — Fresh seed data (25 extras with photos)
 - [ ] Part 6 — Name search
 - [ ] Part 7 — Excel export
