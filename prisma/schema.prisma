@@ -115,6 +115,9 @@ model ExtraProfile {
   facePhotoUrl     String?
   fullBodyPhotoUrl String?
   fcmToken     String?
+  hasSmartphone Boolean @default(true) // false = gets call-request invites by email (Part 9)
+  ibanEncrypted String?                 // encrypted with BANK_DETAILS_ENCRYPTION_KEY, never stored as plain text
+  bicEncrypted  String?
 
   invites      CallInvite[]
   productions  Production[]

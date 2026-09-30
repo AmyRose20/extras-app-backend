@@ -1,7 +1,9 @@
+const prisma = require('../config/db');
 require('../config/firebase'); // initializes the Firebase app
 const { getMessaging } = require('firebase-admin/messaging');
-const prisma = require('../config/db');
 const { ageFromDob, dobFilterForAgeRange } = require('../utils/age');
+const { encrypt, decrypt } = require('../utils/crypto');
+const { normaliseIban, isValidIban, normaliseBic, isValidBic, maskIban } = require('../utils/bankDetails');
 
 // Every coordinator must be linked to a production. Returns the
 // productionId, or sends a 403 and returns null if they aren't linked.
@@ -11,6 +13,25 @@ function requireProduction(req, res) {
     return null;
   }
   return req.user.productionId;
+}
+
+// Removes the encrypted bank fields before a profile is sent anywhere,
+// and adds a safe summary instead.
+//   showMasked = true  → the extra's own view: masked IBAN + BIC
+//   showMasked = false → coordinator view: just whether bank details exist
+function toSafeProfile(profile, { showMasked = false } = {}) {
+  const { ibanEncrypted, bicEncrypted, ...rest } = profile;
+  const hasBankDetails = !!ibanEncrypted;
+
+  const safe = { ...rest, age: ageFromDob(rest.dateOfBirth), hasBankDetails };
+
+  if (showMasked && hasBankDetails) {
+    safe.bankDetails = {
+      ibanMasked: maskIban(decrypt(ibanEncrypted)),
+      bic: decrypt(bicEncrypted),
+    };
+  }
+  return safe;
 }
 
 // GET /profiles/me — an EXTRA viewing their own profile
@@ -31,8 +52,7 @@ async function getMyProfile(req, res) {
 
   const { user, ...rest } = profile;
   return res.json({
-    ...rest,
-    age: ageFromDob(rest.dateOfBirth), // worked out from date of birth
+    ...toSafeProfile(rest, { showMasked: true }),
     deletionRequestStatus: user.deletionRequestStatus,
     deletionRequestedAt: user.deletionRequestedAt,
     deletionReason: user.deletionReason,
@@ -40,26 +60,80 @@ async function getMyProfile(req, res) {
 }
 
 // PATCH /profiles/me — an EXTRA updating their own profile
+// Bank details: send "iban" and "bic" together to set them, or both as "" to remove them.
+// Leave both out to keep the existing ones.
 async function updateMyProfile(req, res) {
-  const { dateOfBirth, gender, heightCm, skills, languages, phoneNumber, contactEmail, availability, facePhotoUrl, fullBodyPhotoUrl } = req.body;
+  try {
+    const {
+      dateOfBirth, gender, heightCm, skills, languages, phoneNumber, contactEmail,
+      availability, facePhotoUrl, fullBodyPhotoUrl, hasSmartphone, iban, bic,
+    } = req.body;
 
-  // dateOfBirth: undefined = leave as is, null/'' = clear it, otherwise a date like "1997-03-14"
-  let dob;
-  if (dateOfBirth === null || dateOfBirth === '') {
-    dob = null;
-  } else if (dateOfBirth !== undefined) {
-    dob = new Date(dateOfBirth);
-    if (isNaN(dob.getTime()) || dob > new Date() || dob.getFullYear() < 1900) {
-      return res.status(400).json({ error: 'Please enter a valid date of birth' });
+    // ----- Date of birth -----
+    // undefined = leave as is, null/'' = clear it, otherwise a date like "1997-03-14"
+    let dob;
+    if (dateOfBirth === null || dateOfBirth === '') {
+      dob = null;
+    } else if (dateOfBirth !== undefined) {
+      dob = new Date(dateOfBirth);
+      if (isNaN(dob.getTime()) || dob > new Date() || dob.getFullYear() < 1900) {
+        return res.status(400).json({ error: 'Please enter a valid date of birth' });
+      }
     }
+
+    // ----- Smartphone -----
+    if (hasSmartphone !== undefined && typeof hasSmartphone !== 'boolean') {
+      return res.status(400).json({ error: 'hasSmartphone must be true or false' });
+    }
+
+    // ----- Bank details -----
+    const bankData = {};
+    if (iban !== undefined || bic !== undefined) {
+      const ibanText = (iban ?? '').trim();
+      const bicText = (bic ?? '').trim();
+
+      if (!ibanText && !bicText) {
+        // Both empty → remove bank details
+        bankData.ibanEncrypted = null;
+        bankData.bicEncrypted = null;
+      } else {
+        if (!ibanText || !bicText) {
+          return res.status(400).json({ error: 'Please enter both your IBAN and BIC' });
+        }
+        if (!isValidIban(ibanText)) {
+          return res.status(400).json({ error: "That IBAN doesn't look right. Please check it." });
+        }
+        if (!isValidBic(bicText)) {
+          return res.status(400).json({ error: "That BIC doesn't look right. It should be 8 or 11 letters/numbers." });
+        }
+        bankData.ibanEncrypted = encrypt(normaliseIban(ibanText));
+        bankData.bicEncrypted = encrypt(normaliseBic(bicText));
+      }
+    }
+
+    const updated = await prisma.extraProfile.update({
+      where: { userId: req.user.userId },
+      data: {
+        dateOfBirth: dob,
+        gender,
+        heightCm,
+        skills,
+        languages,
+        phoneNumber,
+        contactEmail,
+        availability,
+        facePhotoUrl,
+        fullBodyPhotoUrl,
+        hasSmartphone,
+        ...bankData,
+      },
+    });
+
+    return res.json(toSafeProfile(updated, { showMasked: true }));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Something went wrong saving your profile' });
   }
-
-  const updated = await prisma.extraProfile.update({
-    where: { userId: req.user.userId },
-    data: { dateOfBirth: dob, gender, heightCm, skills, languages, phoneNumber, contactEmail, availability, facePhotoUrl, fullBodyPhotoUrl },
-  });
-
-  return res.json({ ...updated, age: ageFromDob(updated.dateOfBirth) });
 }
 
 // PATCH /profiles/me/fcm-token — an EXTRA's device registering its push token
@@ -79,12 +153,12 @@ async function updateFcmToken(req, res) {
     return res.status(404).json({ error: 'No extra profile found for this user' });
   }
 
-  const updated = await prisma.extraProfile.update({
+  await prisma.extraProfile.update({
     where: { userId: req.user.userId },
     data: { fcmToken },
   });
 
-  return res.json(updated);
+  return res.json({ success: true });
 }
 
 // GET /profiles — an ADMIN listing extras on THEIR production (with optional filters)
@@ -126,6 +200,7 @@ async function listProfiles(req, res) {
       include: { user: { select: { name: true } } },
     });
 
+    // Only the summary fields the list needs (no bank details)
     const result = profiles.map((p) => ({
       id: p.id,
       name: p.user.name,
@@ -142,6 +217,7 @@ async function listProfiles(req, res) {
 
 // GET /profiles/:id — an ADMIN viewing one extra's full profile.
 // Only works if that extra is on the coordinator's production.
+// Bank details are NOT included — only whether they exist (see getBankDetails).
 async function getProfileById(req, res) {
   try {
     const productionId = requireProduction(req, res);
@@ -163,14 +239,47 @@ async function getProfileById(req, res) {
 
     const { user, ...rest } = profile;
     return res.json({
-      ...rest,
-      age: ageFromDob(rest.dateOfBirth),
+      ...toSafeProfile(rest), // no masked details for coordinators — they use "Show bank details"
       name: user.name,
       deletionRequestStatus: user.deletionRequestStatus,
     });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Something went wrong loading that profile' });
+  }
+}
+
+// GET /profiles/:id/bank-details — an ADMIN reveals one extra's full bank details.
+// The ONLY place full bank details ever leave the server. Each access is logged.
+async function getBankDetails(req, res) {
+  try {
+    const productionId = requireProduction(req, res);
+    if (!productionId) return;
+
+    const { id } = req.params;
+
+    const profile = await prisma.extraProfile.findFirst({
+      where: { id, productions: { some: { id: productionId } } },
+      select: { id: true, ibanEncrypted: true, bicEncrypted: true },
+    });
+
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+    if (!profile.ibanEncrypted) {
+      return res.status(404).json({ error: 'This extra has not added bank details yet' });
+    }
+
+    console.log(`Bank details viewed: extra ${profile.id} by coordinator ${req.user.userId} at ${new Date().toISOString()}`);
+
+    const iban = decrypt(profile.ibanEncrypted);
+    return res.json({
+      iban: iban.replace(/(.{4})/g, '$1 ').trim(), // "IE29 AIBK 9311 5212 3456 78" (easier to read)
+      bic: decrypt(profile.bicEncrypted),
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Something went wrong loading bank details' });
   }
 }
 
@@ -188,7 +297,6 @@ async function updateMyProductions(req, res) {
       return res.status(400).json({ error: 'You must be on at least one production' });
     }
 
-    // Make sure every id is a real production
     const validProductions = await prisma.production.findMany({
       where: { id: { in: productionIds } },
     });
@@ -204,7 +312,6 @@ async function updateMyProductions(req, res) {
       return res.status(404).json({ error: 'Profile not found' });
     }
 
-    // Which productions are being removed?
     const removedIds = profile.productions
       .map((p) => p.id)
       .filter((id) => !productionIds.includes(id));
@@ -212,7 +319,6 @@ async function updateMyProductions(req, res) {
     const now = new Date();
 
     if (removedIds.length > 0) {
-      // Block if they're booked (ACCEPTED) on an upcoming shoot day for a removed production
       const bookedInvites = await prisma.callInvite.findMany({
         where: {
           extraProfileId: profile.id,
@@ -230,7 +336,6 @@ async function updateMyProductions(req, res) {
       }
     }
 
-    // Do both changes together: update the list + expire pending invites on removed productions
     const [updated] = await prisma.$transaction([
       prisma.extraProfile.update({
         where: { id: profile.id },
@@ -256,8 +361,7 @@ async function updateMyProductions(req, res) {
 
 // DELETE /profiles/:id/production — an ADMIN removes an extra from THEIR production.
 // The extra's account and other productions are untouched.
-// Their pending + accepted invites on upcoming shoot days for this production become EXPIRED
-// (not CANCELLED — it wasn't the extra's choice, so it doesn't count against them).
+// Their pending + accepted invites on upcoming shoot days for this production become EXPIRED.
 async function removeExtraFromMyProduction(req, res) {
   try {
     const productionId = requireProduction(req, res);
@@ -297,7 +401,6 @@ async function removeExtraFromMyProduction(req, res) {
       }),
     ]);
 
-    // Let the extra know (skipped quietly if they have no push token)
     if (profile.fcmToken) {
       try {
         await getMessaging().send({
@@ -325,6 +428,7 @@ module.exports = {
   updateFcmToken,
   listProfiles,
   getProfileById,
+  getBankDetails,
   updateMyProductions,
   removeExtraFromMyProduction,
 };

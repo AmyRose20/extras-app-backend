@@ -137,8 +137,9 @@ async function getCallRequestStatus(req, res) {
         invites: {
           include: {
             extraProfile: {
-              include: {
-                // only the fields the app needs — no passwordHash
+              // only the fields the responses screens need — no bank details or push tokens
+              select: {
+                id: true,
                 user: { select: { id: true, name: true, email: true, phone: true } },
               },
             },
