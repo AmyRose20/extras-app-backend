@@ -3,4 +3,7 @@ node_modules/
 dist/
 *.log
 .DS_Store
+# Firebase service account key (secret - never commit)
 firebase-service-account.json
+# Preview pictures from prisma/previewPhotos.js
+prisma/seed-preview/
