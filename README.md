@@ -24,7 +24,8 @@ based on firsthand experience working as a film extra.
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
-🔄 Phase 3 in progress — Parts 1–4 complete (multi-production support; meeting points, wrap time + Google Maps; date of birth; smartphone + encrypted bank details).
+🔄 Phase 3 in progress — Parts 1–4 complete (multi-production support; meeting points, wrap time + Google Maps; date of birth; smartphone + encrypted bank details; 
+realistic seed data with generated photos).
 
 ## Screenshots
 
@@ -104,6 +105,14 @@ push notifications, live status dashboard, edge case handling, seed data).
 - Extras only ever see a masked IBAN (`IE•• •••• •••• 5678`); coordinators tap
   "Show bank details" to reveal them via a separate, logged, admin-only endpoint
 
+  **Part 5 – Fresh seed data ✅**
+- 25 extras with generated cartoon face and full-body photos (DiceBear + sharp), uploaded
+  to Firebase Storage with the Admin SDK; encrypted fake bank details; 5 without a smartphone
+- Past and upcoming shoot days with invites in every state, including a 3-strikes extra
+- Also: grouped pickers for skills, languages and availability ("Everyday" can't be combined
+  with specific days), dropdown filters and pagination on the extras list, taller photo
+  boxes, gender chips, Archery added as a skill
+
 ## Getting started
 
 1. Install dependencies:
@@ -112,8 +121,10 @@ push notifications, live status dashboard, edge case handling, seed data).
 ```
 2. Copy `.env.example` to `.env` and fill in your local PostgreSQL connection
    string, JWT secret and `GOOGLE_GEOCODING_API_KEY` (a Google Cloud key with the
-   Geocoding API and Places API (New) enabled) and and `BANK_DETAILS_ENCRYPTION_KEY`
-   (64 hex characters — see the command in `.env.example`):
+   Geocoding API and Places API (New) enabled), `BANK_DETAILS_ENCRYPTION_KEY`
+   (64 hex characters — see the command in `.env.example`) and
+   `FIREBASE_STORAGE_BUCKET`. Put your Firebase service account key in the
+   backend folder as `firebase-service-account.json` (it's git-ignored):
 ```
    cp .env.example .env
 ```
@@ -129,6 +140,27 @@ push notifications, live status dashboard, edge case handling, seed data).
 ```
    curl http://localhost:4000/health
 ```
+
+## Seed data
+
+`npx prisma db seed` wipes the database and fills it with realistic test data:
+
+- **2 productions:** Wednesday season 3 and Bloodaxe season 2, each with a saved studio meeting point
+- **2 coordinators:** `wednesday@example.com` and `bloodaxe@example.com`
+- **25 extras:** `extra1@example.com` to `extra25@example.com`
+  - Cartoon face and full-body photos, generated in code (DiceBear "Avataaars" faces + a drawn body) and uploaded to Firebase Storage
+  - A mix of ages (20–71), skills, languages, availability and productions
+  - 5 without a smartphone (extra8, 16, 20, 21, 25)
+  - Fake Irish bank details for 17 of them, encrypted the same way as the app
+- **10 shoot days:** past and upcoming, at saved studios and pinned "Other" locations (Glendalough, Brittas Bay)
+- **10 call requests** with invites in every state: accepted, declined, cancelled, pending and expired
+- **3 strikes:** extra11 (Darragh Nolan) has 3 recent cancellations on Bloodaxe
+
+All passwords are `password123`.
+
+The seed needs `firebase-service-account.json` in the backend folder and `FIREBASE_STORAGE_BUCKET` in `.env`. It deletes all photos under `profile-photos/` in Firebase Storage before uploading new ones.
+
+To preview the cartoon photos without touching the database, run `node prisma/previewPhotos.js`. The pictures are saved to `prisma/seed-preview/`.
 
 ## API overview
 All admin routes are scoped to the coordinator's own production.
@@ -176,7 +208,7 @@ All admin routes are scoped to the coordinator's own production.
 - `users` — accounts, either ADMIN (coordinator, belongs to one production) or EXTRA;
   tracks an optional pending deletion request (self- or admin-initiated) and a
   soft-delete flag once one is approved
-- - `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
+- `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
   availability, photos, smartphone yes/no, encrypted IBAN/BIC; linked to one or more productions
 - `locations` — a production's saved meeting points (name, address, optional map pin)
 - `shoot_days` — a production's shoot day: call date/time, optional estimated wrap time,
@@ -239,7 +271,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 4 — New profile fields (smartphone, encrypted bank details)
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 5 — Fresh seed data (25 extras with photos)
+- [x] Part 5 — Fresh seed data (25 extras with photos)
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 6 — Name search
 - [ ] Part 7 — Excel export
 - [ ] Part 8 — Email setup + forgot password
