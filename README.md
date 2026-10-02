@@ -24,9 +24,9 @@ based on firsthand experience working as a film extra.
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
-🔄 Phase 3 in progress — Parts 1–7 complete (multi-production support; meeting points, wrap time + Google Maps;
+🔄 Phase 3 in progress — Parts 1–8 complete (multi-production support; meeting points, wrap time + Google Maps;
 date of birth; smartphone + encrypted bank details; realistic seed data with generated photos; name search;
-production join requests with coordinator approval).
+production join requests with coordinator approval; notification badges).
 
 ## Screenshots
 
@@ -120,7 +120,6 @@ production join requests with coordinator approval).
 - The search waits until typing stops (debounced) before calling the API, and jumps back to page 1
 - The extras list is always sorted A–Z by name, with a stable tiebreaker so pages don't shuffle
 
-
 **Part 7 – Production join requests ✅**
 - Extras can no longer add themselves to a production: ticking a new one sends a request
   to that production's coordinator, who approves or denies it from a Production Requests screen
@@ -131,6 +130,16 @@ production join requests with coordinator approval).
   (PENDING / APPROVED / DENIED + who reviewed it and when); a hand-edited migration
   copied all existing links across as APPROVED before dropping the old table
 - Push notification to the extra when their request is approved or denied
+
+**Part 8 – Notification badges ✅**
+- Red count badges, Instagram-style: shown when something new arrives, cleared once the screen is opened
+- Extras: new invites (for upcoming shoot days) on the My Invites button
+- Coordinators: new production requests and deletion requests, as a total on the hamburger
+  icon and a count next to each item in the menu
+- Each user stores when they last opened each screen; the badge counts anything newer
+- Counts refresh on Home, when the app returns to the foreground, and when a push arrives while it's open
+- Also: call request skills now match extras with *any* of the selected skills (was *all*),
+  with a clearer hint on the Create Call Request screen
 
 ## Getting started
 
@@ -202,7 +211,7 @@ All admin routes are scoped to the coordinator's own production.
 | GET    | `/shoot-days`          | Admin | List your production's shoot days         |
 | GET    | `/shoot-days/:id`      | Admin | View a shoot day plus its call requests   |
 | PATCH  | `/shoot-days/:id`      | Admin | Edit a shoot day's call time, est. wrap time and/or meeting point (notifies accepted extras of what changed; blocks same-day double-booking) |
-| POST   | `/call-requests`       | Admin | Create a call, auto-matches eligible extras |
+| POST   | `/call-requests`       | Admin | Create a call, auto-matches eligible extras (age, gender, any of the selected skills) |
 | PATCH  | `/call-requests/:id`   | Admin | Edit a call request's description/quantity needed |
 | GET    | `/call-requests/:id`   | Admin | See invite status + accept/decline/cancel tally |
 | POST   | `/call-requests/:id/copy`     | Admin | Copy a call request to other upcoming shoot days |
@@ -219,6 +228,8 @@ All admin routes are scoped to the coordinator's own production.
 | GET    | `/production-requests`             | Admin | List extras asking to join your production |
 | PATCH  | `/production-requests/:id/approve` | Admin | Approve a join request (extra can now be matched and invited) |
 | PATCH  | `/production-requests/:id/deny`    | Admin | Deny a join request (extra can ask again after 30 days) |
+| GET    | `/badges`                     | Any   | Counts of new items since each screen was last opened (extras: invites; admins: deletion + production requests) |
+| PATCH  | `/badges/seen/:type`          | Any   | Mark a screen as opened, resetting its badge (`invites`, `deletionRequests`, `productionRequests`) |
 | GET    | `/locations`                  | Admin | Your production's saved meeting points |
 | POST   | `/locations`                  | Admin | Save a meeting point for next time |
 | GET    | `/geocode/reverse`            | Admin | Turn a map pin into an address (server-side Google key) |
@@ -230,7 +241,8 @@ All admin routes are scoped to the coordinator's own production.
 - `productions` — e.g. "Wednesday season 3"; everything an admin sees is scoped to one
 - `users` — accounts, either ADMIN (coordinator, belongs to one production) or EXTRA;
   tracks an optional pending deletion request (self- or admin-initiated) and a
-  soft-delete flag once one is approved
+  soft-delete flag once one is approved; also records when they last opened each
+  notification screen (used for the red badges)
 - `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
   availability, photos, smartphone yes/no, encrypted IBAN/BIC; linked to productions via `extra_productions`
 - `extra_productions` — an extra's membership of a production: PENDING (asked to join),
@@ -305,7 +317,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 7 — Production join requests (extras request to join a production; coordinator approves or denies)
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 8 — Notification badges (new invites for extras; new deletion/production requests for coordinators)
+- [x] Part 8 — Notification badges (new invites for extras; new deletion/production requests for coordinators)
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 9 — Excel export
 - [ ] Part 10 — Email setup + forgot password
 - [ ] Part 11 — Email invites + email notifications for extras without a smartphone
