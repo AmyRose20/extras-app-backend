@@ -167,7 +167,7 @@ async function listProfiles(req, res) {
     const productionId = requireProduction(req, res);
     if (!productionId) return;
 
-    const { skill, gender, minAge, maxAge, availability } = req.query;
+    const { skill, gender, minAge, maxAge, availability, name } = req.query;
 
     const where = {
       productions: { some: { id: productionId } }, // only extras on my production
@@ -194,9 +194,17 @@ async function listProfiles(req, res) {
         maxAge ? parseInt(maxAge, 10) : null
       );
     }
+   
+    if (name && name.trim()) {
+      where.user = {
+        ...where.user, // keep the "hide deleted extras" check
+        name: { contains: name.trim(), mode: 'insensitive' },
+      };
+    }
 
     const profiles = await prisma.extraProfile.findMany({
       where,
+      orderBy: [{ user: { name: 'asc' } }, { id: 'asc' }],
       include: { user: { select: { name: true } } },
     });
 
