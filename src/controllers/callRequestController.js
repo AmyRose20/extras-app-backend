@@ -104,7 +104,7 @@ async function sendPushNotifications(matchedExtras, callRequest) {
 
 // Finds extra profiles matching the given criteria, limited to extras
 // linked to the given production (extras on both productions still match).
-// criteria can include: minAge, maxAge, gender, skills (array — extra must have ALL listed skills)
+// criteria can include: minAge, maxAge, gender, skills (array — extra must have AT LEAST ONE of the listed skills)
 async function findMatchingExtras(criteria, productionId) {
   const { minAge, maxAge, gender, skills } = criteria;
 
@@ -113,7 +113,7 @@ async function findMatchingExtras(criteria, productionId) {
       memberships: { some: { productionId, status: 'APPROVED' } },
       dateOfBirth: dobFilterForAgeRange(minAge, maxAge),
       gender: gender ?? undefined,
-      skills: skills && skills.length > 0 ? { hasEvery: skills } : undefined,
+      skills: skills && skills.length > 0 ? { hasSome: skills } : undefined,
       user: {
         deletedAt: null,
         deletionRequestStatus: { not: 'PENDING' },

@@ -45,7 +45,7 @@ function matches(extra, criteria) {
   if (criteria.minAge && age < criteria.minAge) return false;
   if (criteria.maxAge && age > criteria.maxAge) return false;
   if (criteria.gender && extra.gender !== criteria.gender) return false;
-  if (criteria.skills && !criteria.skills.every((skill) => extra.skills.includes(skill))) return false;
+  if (criteria.skills && !criteria.skills.some((skill) => extra.skills.includes(skill))) return false;
   return true;
 }
 

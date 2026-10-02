@@ -144,7 +144,7 @@ async function listPendingDeletionRequests(req, res) {
       where: {
         deletionRequestStatus: 'PENDING',
         role: 'EXTRA',
-        memberships: { some: { productionId, status: 'APPROVED' } },
+        extraProfile: { memberships: { some: { productionId, status: 'APPROVED' } } },
       },
       select: {
         id: true,

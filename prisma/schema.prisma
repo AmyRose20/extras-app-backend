@@ -119,6 +119,12 @@ model User {
   deletionReviewedAt        DateTime?
   deletionReviewedByAdminId String?
   deletedAt                 DateTime?
+  
+  // Notification badges (Phase 3 Part 8): when this user last opened each screen.
+  // Anything created after this time counts as "new" and shows in the red badge.
+  invitesLastSeenAt            DateTime @default(now()) // extras: My Invites
+  deletionRequestsLastSeenAt   DateTime @default(now()) // coordinators: Deletion Requests
+  productionRequestsLastSeenAt DateTime @default(now()) // coordinators: Production Requests
 
   @@map("users")
 }
