@@ -24,8 +24,9 @@ based on firsthand experience working as a film extra.
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
-🔄 Phase 3 in progress — Parts 1–6 complete (multi-production support; meeting points, wrap time + Google Maps;
-date of birth; smartphone + encrypted bank details; realistic seed data with generated photos; name search).
+🔄 Phase 3 in progress — Parts 1–7 complete (multi-production support; meeting points, wrap time + Google Maps;
+date of birth; smartphone + encrypted bank details; realistic seed data with generated photos; name search;
+production join requests with coordinator approval).
 
 ## Screenshots
 
@@ -119,6 +120,18 @@ date of birth; smartphone + encrypted bank details; realistic seed data with gen
 - The search waits until typing stops (debounced) before calling the API, and jumps back to page 1
 - The extras list is always sorted A–Z by name, with a stable tiebreaker so pages don't shuffle
 
+
+**Part 7 – Production join requests ✅**
+- Extras can no longer add themselves to a production: ticking a new one sends a request
+  to that production's coordinator, who approves or denies it from a Production Requests screen
+- Until approved, the extra isn't listed, matched or invited for that production;
+  leaving a production stays instant
+- After a denial (or being removed by a coordinator) an extra can ask again after 30 days
+- The hidden many-to-many link was replaced with an explicit `extra_productions` table
+  (PENDING / APPROVED / DENIED + who reviewed it and when); a hand-edited migration
+  copied all existing links across as APPROVED before dropping the old table
+- Push notification to the extra when their request is approved or denied
+
 ## Getting started
 
 1. Install dependencies:
@@ -161,6 +174,7 @@ date of birth; smartphone + encrypted bank details; realistic seed data with gen
 - **10 shoot days:** past and upcoming, at saved studios and pinned "Other" locations (Glendalough, Brittas Bay)
 - **10 call requests** with invites in every state: accepted, declined, cancelled, pending and expired
 - **3 strikes:** extra11 (Darragh Nolan) has 3 recent cancellations on Bloodaxe
+- **Production requests:** extra1 and extra2 are waiting to join Bloodaxe; extra3 was denied for Wednesday 10 days ago
 
 All passwords are `password123`.
 
@@ -177,7 +191,7 @@ All admin routes are scoped to the coordinator's own production.
 | POST   | `/auth/login`          | Any   | Log in, get a JWT                         |
 | GET    | `/profiles/me`         | Extra | View your own profile                     |
 | PATCH  | `/profiles/me`         | Extra | Update your own profile (date of birth, photos, skills, etc.) |
-| PATCH  | `/profiles/me/productions` | Extra | Set which productions you're on (must keep one; blocked if booked on an upcoming shoot) |
+| PATCH  | `/profiles/me/productions` | Extra | Set the productions you want: new ones become join requests, unticked ones are left/cancelled (must keep one approved; blocked if booked on an upcoming shoot) |
 | GET    | `/profiles`            | Admin | List extras on your production, sorted A–Z (search by `name`; filter by skill, gender, availability, age) |
 | GET    | `/profiles/:id`        | Admin | View an extra's full profile (your production only) |
 | GET    | `/profiles/:id/bank-details` | Admin | Reveal an extra's full IBAN/BIC (decrypted on request, access logged) |
@@ -202,6 +216,9 @@ All admin routes are scoped to the coordinator's own production.
 | GET    | `/deletion-requests`             | Admin | List all pending deletion requests          |
 | PATCH  | `/deletion-requests/:id/approve` | Admin | Approve a request (soft-deletes the account)|
 | PATCH  | `/deletion-requests/:id/deny`    | Admin | Deny a deletion request                     |
+| GET    | `/production-requests`             | Admin | List extras asking to join your production |
+| PATCH  | `/production-requests/:id/approve` | Admin | Approve a join request (extra can now be matched and invited) |
+| PATCH  | `/production-requests/:id/deny`    | Admin | Deny a join request (extra can ask again after 30 days) |
 | GET    | `/locations`                  | Admin | Your production's saved meeting points |
 | POST   | `/locations`                  | Admin | Save a meeting point for next time |
 | GET    | `/geocode/reverse`            | Admin | Turn a map pin into an address (server-side Google key) |
@@ -215,7 +232,9 @@ All admin routes are scoped to the coordinator's own production.
   tracks an optional pending deletion request (self- or admin-initiated) and a
   soft-delete flag once one is approved
 - `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
-  availability, photos, smartphone yes/no, encrypted IBAN/BIC; linked to one or more productions
+  availability, photos, smartphone yes/no, encrypted IBAN/BIC; linked to productions via `extra_productions`
+- `extra_productions` — an extra's membership of a production: PENDING (asked to join),
+  APPROVED (can be matched and invited) or DENIED, plus who reviewed it and when
 - `locations` — a production's saved meeting points (name, address, optional map pin)
 - `shoot_days` — a production's shoot day: call date/time, optional estimated wrap time,
   and meeting point (name, address, optional map pin)
@@ -283,7 +302,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 6 — Name search (case-insensitive, debounced, list always sorted A–Z)
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 7 — Production join requests (extras request to join a production; coordinator approves or denies)
+- [x] Part 7 — Production join requests (extras request to join a production; coordinator approves or denies)
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 8 — Notification badges (new invites for extras; new deletion/production requests for coordinators)
 - [ ] Part 9 — Excel export
 - [ ] Part 10 — Email setup + forgot password
