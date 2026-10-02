@@ -30,7 +30,7 @@ function findExtraOnProduction(userId, productionId) {
     where: {
       id: userId,
       role: 'EXTRA',
-      extraProfile: { productions: { some: { id: productionId } } },
+      extraProfile: { memberships: { some: { productionId, status: 'APPROVED' } } },   
     },
   });
 }
@@ -144,7 +144,7 @@ async function listPendingDeletionRequests(req, res) {
       where: {
         deletionRequestStatus: 'PENDING',
         role: 'EXTRA',
-        extraProfile: { productions: { some: { id: productionId } } },
+        memberships: { some: { productionId, status: 'APPROVED' } },
       },
       select: {
         id: true,

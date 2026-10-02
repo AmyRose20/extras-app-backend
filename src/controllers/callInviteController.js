@@ -169,7 +169,7 @@ async function getExtraTally(req, res) {
     const { extraProfileId } = req.params;
 
     const profile = await prisma.extraProfile.findFirst({
-      where: { id: extraProfileId, productions: { some: { id: productionId } } },
+      where: { id: extraProfileId, memberships: { some: { productionId, status: 'APPROVED' } } },
     });
     if (!profile) {
       return res.status(404).json({ error: 'Extra profile not found' });

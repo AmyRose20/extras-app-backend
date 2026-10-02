@@ -164,7 +164,12 @@ async function main() {
             contactEmail: data.email,
             hasSmartphone: data.hasSmartphone,
             ...bankFields,
-            productions: { connect: data.productions.map((key) => ({ id: productionsByKey[key].id })) },
+            memberships: {
+                 create: data.productions.map((key) => ({
+                   production: { connect: { id: productionsByKey[key].id } },
+                   status: 'APPROVED', // seeded extras start approved on their productions
+                 })),
+               },
           },
         },
       },
@@ -291,6 +296,33 @@ async function main() {
   await callRequest(bxSoon, 'bloodaxe', 'Archers on the ramparts', 3, { skills: ['Archery'] });
   await callRequest(bxSoon, 'bloodaxe', 'Villagers fleeing the raid', 6, {});
   await callRequest(bxBeach, 'bloodaxe', 'Longship landing', 5, { gender: 'MALE', minAge: 20, maxAge: 50 });
+
+
+  // ----- Production join requests (Phase 3 Part 7) -----
+  // Two Wednesday-only extras asking to join Bloodaxe (PENDING),
+  // and one Bloodaxe-only extra denied by Wednesday 10 days ago (can ask again in 20 days).
+  const profileIdFor = (email) => {
+       const extra = extras.find((e) => e.data.email === email);
+       if (!extra) throw new Error(`Seed: no extra with email ${email}`);
+       return extra.profileId;
+     };
+     await prisma.extraProduction.create({
+       data: { extraProfileId: profileIdFor('extra1@example.com'), productionId: bloodaxe.id },
+     });
+     await prisma.extraProduction.create({
+       data: { extraProfileId: profileIdFor('extra2@example.com'), productionId: bloodaxe.id },
+     });
+     await prisma.extraProduction.create({
+       data: {
+         extraProfileId: profileIdFor('extra3@example.com'),
+         productionId: wednesday.id,
+         status: 'DENIED',
+         requestedAt: dayAt(-12, 10),
+         reviewedAt: dayAt(-10, 12),
+         reviewedByAdminId: wednesdayAdmin.id,
+       },
+     });
+  console.log('Created 2 pending production requests (Bloodaxe) and 1 denied (Wednesday).');
 
   console.log(`Created ${inviteCount} invites.`);
   console.log('');

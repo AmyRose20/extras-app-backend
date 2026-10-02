@@ -49,12 +49,36 @@ model Production {
   name      String   @unique // e.g. "Wednesday season 3"
   createdAt DateTime @default(now())
 
-  coordinators User[]         // admins tied to this production
-  extras       ExtraProfile[] // extras available to this production
-  shootDays    ShootDay[]
-  locations    Location[]
+  coordinators     User[] // admins tied to this production
+  extraMemberships ExtraProduction[] // extras' memberships of this production
+  shootDays        ShootDay[]
+  locations        Location[]
 
   @@map("productions")
+}
+
+// Whether an extra is allowed on a production.
+// Extras request to join (PENDING); the production's coordinator approves or denies.
+enum MembershipStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+model ExtraProduction {
+  id                String           @id @default(uuid())
+  extraProfileId    String
+  productionId      String
+  status            MembershipStatus @default(PENDING)
+  requestedAt       DateTime         @default(now())
+  reviewedAt        DateTime? // when the coordinator approved/denied
+  reviewedByAdminId String? // which coordinator (User.id is a UUID string)
+
+  extraProfile ExtraProfile @relation(fields: [extraProfileId], references: [id], onDelete: Cascade)
+  production   Production   @relation(fields: [productionId], references: [id], onDelete: Cascade)
+
+  @@unique([extraProfileId, productionId]) // one membership per extra per production
+  @@map("extra_productions")
 }
 
 // A saved meeting point for a production, e.g. "Ashford Studios - Phase 1"
@@ -62,7 +86,7 @@ model Location {
   id           String     @id @default(uuid())
   name         String
   address      String
-  latitude     Float?     // optional, for a future map/pin-drop upgrade
+  latitude     Float? // optional, for a future map/pin-drop upgrade
   longitude    Float?
   productionId String
   production   Production @relation(fields: [productionId], references: [id])
@@ -100,27 +124,27 @@ model User {
 }
 
 model ExtraProfile {
-  id           String   @id @default(uuid())
-  userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  dateOfBirth  DateTime? @db.Date  // replaces age; age is worked out from this
-  gender       Gender?
-  heightCm     Int?
-  skills       String[] // e.g. ["stunt work", "horse riding", "sign language"]
-  languages    String[] // e.g. ["English", "Irish", "French"]
-  phoneNumber   String?
-  contactEmail  String?
-  availability String[] // e.g. ["Everyday"] or ["Mondays", "Wednesdays", "Fridays"]
+  dateOfBirth      DateTime? @db.Date // replaces age; age is worked out from this
+  gender           Gender?
+  heightCm         Int?
+  skills           String[] // e.g. ["stunt work", "horse riding", "sign language"]
+  languages        String[] // e.g. ["English", "Irish", "French"]
+  phoneNumber      String?
+  contactEmail     String?
+  availability     String[] // e.g. ["Everyday"] or ["Mondays", "Wednesdays", "Fridays"]
   facePhotoUrl     String?
   fullBodyPhotoUrl String?
-  fcmToken     String?
-  hasSmartphone Boolean @default(true) // false = gets call-request invites by email (Part 9)
-  ibanEncrypted String?                 // encrypted with BANK_DETAILS_ENCRYPTION_KEY, never stored as plain text
-  bicEncrypted  String?
+  fcmToken         String?
+  hasSmartphone    Boolean   @default(true) // false = gets call-request invites by email (Part 9)
+  ibanEncrypted    String? // encrypted with BANK_DETAILS_ENCRYPTION_KEY, never stored as plain text
+  bicEncrypted     String?
 
-  invites      CallInvite[]
-  productions  Production[]
+  invites     CallInvite[]
+  memberships ExtraProduction[] // which productions this extra is on (pending/approved/denied)
 
   @@map("extra_profiles")
 }
@@ -131,50 +155,50 @@ model ShootDay {
   production      Production @relation(fields: [productionId], references: [id])
   date            DateTime
   location        String
-  locationAddress String?   // full address of the meeting point
-  latitude        Float?    // optional, for a future map/pin-drop upgrade
+  locationAddress String? // full address of the meeting point
+  latitude        Float? // optional, for a future map/pin-drop upgrade
   longitude       Float?
   estimatedWrapAt DateTime? // optional estimated wrap time
   createdById     String
   createdBy       User       @relation(fields: [createdById], references: [id])
   createdAt       DateTime   @default(now())
 
-  callRequests    CallRequest[]
+  callRequests CallRequest[]
 
   @@map("shoot_days")
 }
 
 model CallRequest {
-  id             String   @id @default(uuid())
-  shootDayId     String
-  shootDay       ShootDay @relation(fields: [shootDayId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  shootDayId String
+  shootDay   ShootDay @relation(fields: [shootDayId], references: [id], onDelete: Cascade)
 
-  description    String   // e.g. "20 men, fight scene"
+  description    String // e.g. "20 men, fight scene"
   quantityNeeded Int
 
   // Matching criteria — kept flexible as JSON so we can add filters
   // without a migration every time, e.g.:
   // { "minAge": 25, "maxAge": 45, "gender": "MALE", "skills": ["stunt work"] }
-  criteria       Json
+  criteria Json
 
-  createdAt      DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  invites        CallInvite[]
+  invites CallInvite[]
 
   @@map("call_requests")
 }
 
 model CallInvite {
-  id            String       @id @default(uuid())
+  id            String      @id @default(uuid())
   callRequestId String
-  callRequest   CallRequest  @relation(fields: [callRequestId], references: [id], onDelete: Cascade)
+  callRequest   CallRequest @relation(fields: [callRequestId], references: [id], onDelete: Cascade)
 
   extraProfileId String
   extraProfile   ExtraProfile @relation(fields: [extraProfileId], references: [id], onDelete: Cascade)
 
-  status        InviteStatus @default(PENDING)
-  sentAt        DateTime     @default(now())
-  respondedAt   DateTime?
+  status      InviteStatus @default(PENDING)
+  sentAt      DateTime     @default(now())
+  respondedAt DateTime?
 
   // One extra should only be invited once per call request
   @@unique([callRequestId, extraProfileId])

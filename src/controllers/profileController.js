@@ -5,6 +5,11 @@ const { ageFromDob, dobFilterForAgeRange } = require('../utils/age');
 const { encrypt, decrypt } = require('../utils/crypto');
 const { normaliseIban, isValidIban, normaliseBic, isValidBic, maskIban } = require('../utils/bankDetails');
 
+// After a request is denied (or a coordinator removes them), an extra must wait
+// this many days before asking to join that production again.
+const REQUEST_AGAIN_AFTER_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 // Every coordinator must be linked to a production. Returns the
 // productionId, or sends a 403 and returns null if they aren't linked.
 function requireProduction(req, res) {
@@ -34,6 +39,39 @@ function toSafeProfile(profile, { showMasked = false } = {}) {
   return safe;
 }
 
+// When a DENIED extra may ask to join that production again.
+function canRequestAgainAt(membership) {
+  const from = membership.reviewedAt ?? membership.requestedAt;
+  return new Date(from.getTime() + REQUEST_AGAIN_AFTER_DAYS * DAY_MS);
+}
+
+// Splits an extra's memberships into three lists for the app:
+//   productions        → APPROVED (same shape as before: [{ id, name }])
+//   pendingProductions → waiting for the coordinator
+//   deniedProductions  → not approved, with the date they can ask again
+function splitMemberships(memberships) {
+  const productions = [];
+  const pendingProductions = [];
+  const deniedProductions = [];
+
+  for (const m of memberships) {
+    const production = { id: m.production.id, name: m.production.name };
+    if (m.status === 'APPROVED') {
+      productions.push(production);
+    } else if (m.status === 'PENDING') {
+      pendingProductions.push({ ...production, requestedAt: m.requestedAt });
+    } else {
+      deniedProductions.push({ ...production, canRequestAgainAt: canRequestAgainAt(m) });
+    }
+  }
+  return { productions, pendingProductions, deniedProductions };
+}
+
+// Used in includes: each membership plus its production's id + name
+const MEMBERSHIP_WITH_PRODUCTION = {
+  include: { production: { select: { id: true, name: true } } },
+};
+
 // GET /profiles/me — an EXTRA viewing their own profile
 async function getMyProfile(req, res) {
   const profile = await prisma.extraProfile.findUnique({
@@ -42,7 +80,7 @@ async function getMyProfile(req, res) {
       user: {
         select: { deletionRequestStatus: true, deletionRequestedAt: true, deletionReason: true },
       },
-      productions: { select: { id: true, name: true } },
+      memberships: MEMBERSHIP_WITH_PRODUCTION,
     },
   });
 
@@ -50,9 +88,10 @@ async function getMyProfile(req, res) {
     return res.status(404).json({ error: 'Profile not found' });
   }
 
-  const { user, ...rest } = profile;
+  const { user, memberships, ...rest } = profile;
   return res.json({
     ...toSafeProfile(rest, { showMasked: true }),
+    ...splitMemberships(memberships),
     deletionRequestStatus: user.deletionRequestStatus,
     deletionRequestedAt: user.deletionRequestedAt,
     deletionReason: user.deletionReason,
@@ -170,8 +209,8 @@ async function listProfiles(req, res) {
     const { skill, gender, minAge, maxAge, availability, name } = req.query;
 
     const where = {
-      productions: { some: { id: productionId } }, // only extras on my production
-      user: { deletedAt: null },                    // hide soft-deleted extras
+      memberships: { some: { productionId, status: 'APPROVED' } }, // only APPROVED extras on my production
+      user: { deletedAt: null },                                     // hide soft-deleted extras
     };
 
     if (skill) {
@@ -194,7 +233,7 @@ async function listProfiles(req, res) {
         maxAge ? parseInt(maxAge, 10) : null
       );
     }
-   
+
     if (name && name.trim()) {
       where.user = {
         ...where.user, // keep the "hide deleted extras" check
@@ -224,7 +263,7 @@ async function listProfiles(req, res) {
 }
 
 // GET /profiles/:id — an ADMIN viewing one extra's full profile.
-// Only works if that extra is on the coordinator's production.
+// Only works if that extra is APPROVED on the coordinator's production.
 // Bank details are NOT included — only whether they exist (see getBankDetails).
 async function getProfileById(req, res) {
   try {
@@ -234,10 +273,11 @@ async function getProfileById(req, res) {
     const { id } = req.params;
 
     const profile = await prisma.extraProfile.findFirst({
-      where: { id, productions: { some: { id: productionId } } },
+      where: { id, memberships: { some: { productionId, status: 'APPROVED' } } },
       include: {
         user: { select: { name: true, deletionRequestStatus: true } },
-        productions: { select: { id: true, name: true } },
+        // coordinators only see the productions the extra is APPROVED on
+        memberships: { where: { status: 'APPROVED' }, ...MEMBERSHIP_WITH_PRODUCTION },
       },
     });
 
@@ -245,9 +285,10 @@ async function getProfileById(req, res) {
       return res.status(404).json({ error: 'Profile not found' });
     }
 
-    const { user, ...rest } = profile;
+    const { user, memberships, ...rest } = profile;
     return res.json({
       ...toSafeProfile(rest), // no masked details for coordinators — they use "Show bank details"
+      productions: memberships.map((m) => m.production),
       name: user.name,
       deletionRequestStatus: user.deletionRequestStatus,
     });
@@ -267,7 +308,7 @@ async function getBankDetails(req, res) {
     const { id } = req.params;
 
     const profile = await prisma.extraProfile.findFirst({
-      where: { id, productions: { some: { id: productionId } } },
+      where: { id, memberships: { some: { productionId, status: 'APPROVED' } } },
       select: { id: true, ibanEncrypted: true, bicEncrypted: true },
     });
 
@@ -291,12 +332,17 @@ async function getBankDetails(req, res) {
   }
 }
 
-// PATCH /profiles/me/productions — an EXTRA sets which productions they're on.
+// PATCH /profiles/me/productions — an EXTRA sets which productions they WANT to be on.
 // body: { "productionIds": ["...", "..."] }  (the FULL list they want, not just changes)
+// Compared with what they have now:
+//  - APPROVED but not in the list → they LEAVE it (instant, no approval needed)
+//  - PENDING but not in the list  → their request is CANCELLED
+//  - in the list but not approved/pending → a new REQUEST (PENDING) for that coordinator
 // Rules:
-//  - must keep at least one production
+//  - must stay on at least one APPROVED production
 //  - can't leave a production they have upcoming ACCEPTED shoot days on
-//  - pending invites on upcoming shoot days of a removed production become EXPIRED
+//  - can't re-request a DENIED production until REQUEST_AGAIN_AFTER_DAYS have passed
+//  - pending invites on upcoming shoot days of a production they leave become EXPIRED
 async function updateMyProductions(req, res) {
   try {
     const { productionIds } = req.body;
@@ -304,34 +350,61 @@ async function updateMyProductions(req, res) {
     if (!Array.isArray(productionIds) || productionIds.length === 0) {
       return res.status(400).json({ error: 'You must be on at least one production' });
     }
+    const wantedIds = [...new Set(productionIds)]; // ignore duplicates
 
     const validProductions = await prisma.production.findMany({
-      where: { id: { in: productionIds } },
+      where: { id: { in: wantedIds } },
     });
-    if (validProductions.length !== productionIds.length) {
+    if (validProductions.length !== wantedIds.length) {
       return res.status(400).json({ error: 'One or more productions were not found' });
     }
 
     const profile = await prisma.extraProfile.findUnique({
       where: { userId: req.user.userId },
-      include: { productions: true },
+      include: { memberships: true },
     });
     if (!profile) {
       return res.status(404).json({ error: 'Profile not found' });
     }
 
-    const removedIds = profile.productions
-      .map((p) => p.id)
-      .filter((id) => !productionIds.includes(id));
+    const membershipByProduction = new Map(profile.memberships.map((m) => [m.productionId, m]));
+    const idsWithStatus = (status) =>
+      profile.memberships.filter((m) => m.status === status).map((m) => m.productionId);
+
+    const approvedIds = idsWithStatus('APPROVED');
+    const pendingIds = idsWithStatus('PENDING');
+
+    const leavingIds = approvedIds.filter((id) => !wantedIds.includes(id));
+    const cancelIds = pendingIds.filter((id) => !wantedIds.includes(id));
+    const requestIds = wantedIds.filter((id) => !approvedIds.includes(id) && !pendingIds.includes(id));
+
+    if (!approvedIds.some((id) => wantedIds.includes(id))) {
+      return res.status(400).json({ error: 'You must stay on at least one approved production' });
+    }
 
     const now = new Date();
 
-    if (removedIds.length > 0) {
+    // Denied recently? Not allowed to ask again yet.
+    for (const id of requestIds) {
+      const membership = membershipByProduction.get(id);
+      if (membership && membership.status === 'DENIED') {
+        const againAt = canRequestAgainAt(membership);
+        if (againAt > now) {
+          const productionName = validProductions.find((p) => p.id === id).name;
+          return res.status(400).json({
+            error: `You can ask to join ${productionName} again from ${againAt.toLocaleDateString('en-IE')}.`,
+          });
+        }
+      }
+    }
+
+    // Booked on an upcoming shoot day for a production they're leaving? Cancel those first.
+    if (leavingIds.length > 0) {
       const bookedInvites = await prisma.callInvite.findMany({
         where: {
           extraProfileId: profile.id,
           status: 'ACCEPTED',
-          callRequest: { shootDay: { productionId: { in: removedIds }, date: { gt: now } } },
+          callRequest: { shootDay: { productionId: { in: leavingIds }, date: { gt: now } } },
         },
         include: { callRequest: { include: { shootDay: { include: { production: true } } } } },
       });
@@ -344,23 +417,36 @@ async function updateMyProductions(req, res) {
       }
     }
 
-    const [updated] = await prisma.$transaction([
-      prisma.extraProfile.update({
-        where: { id: profile.id },
-        data: { productions: { set: productionIds.map((id) => ({ id })) } },
-        include: { productions: { select: { id: true, name: true } } },
+    await prisma.$transaction([
+      // Leave approved productions + cancel pending requests
+      prisma.extraProduction.deleteMany({
+        where: { extraProfileId: profile.id, productionId: { in: [...leavingIds, ...cancelIds] } },
       }),
+      // New requests (or a fresh request after a denial has expired)
+      ...requestIds.map((productionId) =>
+        prisma.extraProduction.upsert({
+          where: { extraProfileId_productionId: { extraProfileId: profile.id, productionId } },
+          create: { extraProfileId: profile.id, productionId }, // status defaults to PENDING
+          update: { status: 'PENDING', requestedAt: now, reviewedAt: null, reviewedByAdminId: null },
+        })
+      ),
+      // Pending invites for productions they've left can no longer be answered
       prisma.callInvite.updateMany({
         where: {
           extraProfileId: profile.id,
           status: 'PENDING',
-          callRequest: { shootDay: { productionId: { in: removedIds }, date: { gt: now } } },
+          callRequest: { shootDay: { productionId: { in: leavingIds }, date: { gt: now } } },
         },
         data: { status: 'EXPIRED' },
       }),
     ]);
 
-    return res.json(updated.productions);
+    const memberships = await prisma.extraProduction.findMany({
+      where: { extraProfileId: profile.id },
+      ...MEMBERSHIP_WITH_PRODUCTION,
+    });
+
+    return res.json(splitMemberships(memberships));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Something went wrong updating your productions' });
@@ -369,6 +455,7 @@ async function updateMyProductions(req, res) {
 
 // DELETE /profiles/:id/production — an ADMIN removes an extra from THEIR production.
 // The extra's account and other productions are untouched.
+// Their membership becomes DENIED (so they can't instantly re-request; the 30-day wait applies).
 // Their pending + accepted invites on upcoming shoot days for this production become EXPIRED.
 async function removeExtraFromMyProduction(req, res) {
   try {
@@ -378,26 +465,26 @@ async function removeExtraFromMyProduction(req, res) {
     const { id } = req.params;
 
     const profile = await prisma.extraProfile.findFirst({
-      where: { id, productions: { some: { id: productionId } } },
-      include: { productions: true },
+      where: { id, memberships: { some: { productionId, status: 'APPROVED' } } },
+      include: { memberships: { where: { status: 'APPROVED' }, ...MEMBERSHIP_WITH_PRODUCTION } },
     });
     if (!profile) {
       return res.status(404).json({ error: 'Profile not found' });
     }
 
-    if (profile.productions.length === 1) {
+    if (profile.memberships.length === 1) {
       return res.status(400).json({
         error: "This is the extra's only production. Use a deletion request instead.",
       });
     }
 
-    const production = profile.productions.find((p) => p.id === productionId);
+    const production = profile.memberships.find((m) => m.productionId === productionId).production;
     const now = new Date();
 
     await prisma.$transaction([
-      prisma.extraProfile.update({
-        where: { id: profile.id },
-        data: { productions: { disconnect: { id: productionId } } },
+      prisma.extraProduction.update({
+        where: { extraProfileId_productionId: { extraProfileId: profile.id, productionId } },
+        data: { status: 'DENIED', reviewedAt: now, reviewedByAdminId: req.user.userId },
       }),
       prisma.callInvite.updateMany({
         where: {

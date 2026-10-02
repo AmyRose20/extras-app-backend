@@ -110,7 +110,7 @@ async function findMatchingExtras(criteria, productionId) {
 
   return prisma.extraProfile.findMany({
     where: {
-      productions: { some: { id: productionId } },
+      memberships: { some: { productionId, status: 'APPROVED' } },
       dateOfBirth: dobFilterForAgeRange(minAge, maxAge),
       gender: gender ?? undefined,
       skills: skills && skills.length > 0 ? { hasEvery: skills } : undefined,
