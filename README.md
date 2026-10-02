@@ -24,8 +24,8 @@ based on firsthand experience working as a film extra.
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
-🔄 Phase 3 in progress — Parts 1–4 complete (multi-production support; meeting points, wrap time + Google Maps; date of birth; smartphone + encrypted bank details; 
-realistic seed data with generated photos).
+🔄 Phase 3 in progress — Parts 1–6 complete (multi-production support; meeting points, wrap time + Google Maps;
+date of birth; smartphone + encrypted bank details; realistic seed data with generated photos; name search).
 
 ## Screenshots
 
@@ -105,13 +105,19 @@ realistic seed data with generated photos).
 - Extras only ever see a masked IBAN (`IE•• •••• •••• 5678`); coordinators tap
   "Show bank details" to reveal them via a separate, logged, admin-only endpoint
 
-  **Part 5 – Fresh seed data ✅**
+**Part 5 – Fresh seed data ✅**
 - 25 extras with generated cartoon face and full-body photos (DiceBear + sharp), uploaded
   to Firebase Storage with the Admin SDK; encrypted fake bank details; 5 without a smartphone
 - Past and upcoming shoot days with invites in every state, including a 3-strikes extra
 - Also: grouped pickers for skills, languages and availability ("Everyday" can't be combined
   with specific days), dropdown filters and pagination on the extras list, taller photo
   boxes, gender chips, Archery added as a skill
+
+**Part 6 – Name search ✅**
+- Coordinators search extras by name (case-insensitive, matches anywhere in the name)
+- Works together with the skill, gender, availability and age filters
+- The search waits until typing stops (debounced) before calling the API, and jumps back to page 1
+- The extras list is always sorted A–Z by name, with a stable tiebreaker so pages don't shuffle
 
 ## Getting started
 
@@ -172,7 +178,7 @@ All admin routes are scoped to the coordinator's own production.
 | GET    | `/profiles/me`         | Extra | View your own profile                     |
 | PATCH  | `/profiles/me`         | Extra | Update your own profile (date of birth, photos, skills, etc.) |
 | PATCH  | `/profiles/me/productions` | Extra | Set which productions you're on (must keep one; blocked if booked on an upcoming shoot) |
-| GET    | `/profiles`            | Admin | List extras on your production (filter by skill, gender, availability, age) |
+| GET    | `/profiles`            | Admin | List extras on your production, sorted A–Z (search by `name`; filter by skill, gender, availability, age) |
 | GET    | `/profiles/:id`        | Admin | View an extra's full profile (your production only) |
 | GET    | `/profiles/:id/bank-details` | Admin | Reveal an extra's full IBAN/BIC (decrypted on request, access logged) |
 | DELETE | `/profiles/:id/production` | Admin | Remove an extra from your production; their upcoming invites for it become expired |
@@ -274,12 +280,16 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 5 — Fresh seed data (25 extras with photos)
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 6 — Name search
-- [ ] Part 7 — Excel export
-- [ ] Part 8 — Email setup + forgot password
-- [ ] Part 9 — Email invites + email notifications for extras without a smartphone
-- [ ] Part 10 — Code reorganisation (hooks/navigation, API layer, shared theme + components)
-- [ ] Part 11 — Screenshots of all screens and workflows
+- [x] Part 6 — Name search (case-insensitive, debounced, list always sorted A–Z)
+  - [x] Functionality
+  - [x] UI polish
+- [ ] Part 7 — Production join requests (extras request to join a production; coordinator approves or denies)
+- [ ] Part 8 — Notification badges (new invites for extras; new deletion/production requests for coordinators)
+- [ ] Part 9 — Excel export
+- [ ] Part 10 — Email setup + forgot password
+- [ ] Part 11 — Email invites + email notifications for extras without a smartphone
+- [ ] Part 12 — Code reorganisation (hooks/navigation, API layer, shared theme + components)
+- [ ] Part 13 — Screenshots of all screens and workflows
 
 ## License
 
