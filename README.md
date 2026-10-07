@@ -19,14 +19,15 @@ based on firsthand experience working as a film extra.
   per-user via a Firebase custom auth token issued by the backend at login
 - **Maps:** Google Maps Platform — Maps SDK (in-app map), Places API (search) and
   Geocoding API (pin → address), the last two called server-side so the key stays private
+- **Excel export:** exceljs (server-side), shared from the app with react-native-blob-util + react-native-share
 
 ## Status
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
-🔄 Phase 3 in progress — Parts 1–8 complete (multi-production support; meeting points, wrap time + Google Maps;
+🔄 Phase 3 in progress — Parts 1–9 complete (multi-production support; meeting points, wrap time + Google Maps;
 date of birth; smartphone + encrypted bank details; realistic seed data with generated photos; name search;
-production join requests with coordinator approval; notification badges).
+production join requests with coordinator approval; notification badges; attendance + payroll export to Excel).
 
 ## Screenshots
 
@@ -140,6 +141,21 @@ production join requests with coordinator approval; notification badges).
 - Counts refresh on Home, when the app returns to the foreground, and when a push arrives while it's open
 - Also: call request skills now match extras with *any* of the selected skills (was *all*),
   with a clearer hint on the Create Call Request screen
+ 
+**Part 9 – Attendance + payroll export ✅**
+- Attendance screen for each shoot day once it has started: coordinators mark no-shows
+  and record each extra's finish time (starts as the estimated wrap; change individuals
+  or set one time for everyone; overnight shoots handled)
+- Payroll export to Excel, built server-side with exceljs: everyone who worked (no-shows
+  left out), with name, phone, email, account holder name, IBAN, BIC, date, call time,
+  finish time and hours; missing bank details / finish times highlighted in red
+- The app downloads the file with the coordinator's token and opens Android's share menu
+  (email, WhatsApp, Drive); the file is kept in the app's private cache and cleared on the next export
+- Bank-details warning before every export, and every export is logged on the server
+- New account holder name, required alongside IBAN/BIC (banks now check the payee name
+  under EU Verification of Payee); pre-filled with the extra's own name
+- No-shows are a new invite status: shown to the extra, counted in both tallies, and
+  counted towards the 3-strikes flag alongside cancellations
 
 ## Getting started
 
@@ -184,6 +200,9 @@ production join requests with coordinator approval; notification badges).
 - **10 call requests** with invites in every state: accepted, declined, cancelled, pending and expired
 - **3 strikes:** extra11 (Darragh Nolan) has 3 recent cancellations on Bloodaxe
 - **Production requests:** extra1 and extra2 are waiting to join Bloodaxe; extra3 was denied for Wednesday 10 days ago
+- **Attendance + payroll:** one no-show per production on a past shoot day, plus varied finish
+  times (one extra released early, one kept late); extra1's bank account is a joint account
+  ("Jordan & Sam Lee") to show a different account holder name
 
 All passwords are `password123`.
 
@@ -199,11 +218,11 @@ All admin routes are scoped to the coordinator's own production.
 | POST   | `/auth/register`       | Any   | Create an account (ADMIN or EXTRA)        |
 | POST   | `/auth/login`          | Any   | Log in, get a JWT                         |
 | GET    | `/profiles/me`         | Extra | View your own profile                     |
-| PATCH  | `/profiles/me`         | Extra | Update your own profile (date of birth, photos, skills, etc.) |
+| PATCH  | `/profiles/me`         | Extra | Update your own profile (date of birth, photos, skills, bank details + account holder name, etc.) |
 | PATCH  | `/profiles/me/productions` | Extra | Set the productions you want: new ones become join requests, unticked ones are left/cancelled (must keep one approved; blocked if booked on an upcoming shoot) |
 | GET    | `/profiles`            | Admin | List extras on your production, sorted A–Z (search by `name`; filter by skill, gender, availability, age) |
 | GET    | `/profiles/:id`        | Admin | View an extra's full profile (your production only) |
-| GET    | `/profiles/:id/bank-details` | Admin | Reveal an extra's full IBAN/BIC (decrypted on request, access logged) |
+| GET    | `/profiles/:id/bank-details` | Admin | Reveal an extra's full IBAN/BIC + account holder name (decrypted on request, access logged) |
 | DELETE | `/profiles/:id/production` | Admin | Remove an extra from your production; their upcoming invites for it become expired |
 | GET    | `/productions`         | Any   | List all productions                      |
 | POST   | `/shoot-days`          | Admin | Create a shoot day                        |
@@ -211,14 +230,18 @@ All admin routes are scoped to the coordinator's own production.
 | GET    | `/shoot-days`          | Admin | List your production's shoot days         |
 | GET    | `/shoot-days/:id`      | Admin | View a shoot day plus its call requests   |
 | PATCH  | `/shoot-days/:id`      | Admin | Edit a shoot day's call time, est. wrap time and/or meeting point (notifies accepted extras of what changed; blocks same-day double-booking) |
+| GET    | `/shoot-days/:id/attendance`  | Admin | Who accepted a started shoot day, with no-show status and finish times |
+| PATCH  | `/shoot-days/:id/attendance/:inviteId` | Admin | Mark/unmark a no-show and/or set one extra's finish time |
+| PATCH  | `/shoot-days/:id/finish-time` | Admin | Set the same finish time for everyone who turned up |
+| GET    | `/shoot-days/:id/payroll`     | Admin | Download the payroll Excel file (who worked, bank details, hours; export logged) |
 | POST   | `/call-requests`       | Admin | Create a call, auto-matches eligible extras (age, gender, any of the selected skills) |
 | PATCH  | `/call-requests/:id`   | Admin | Edit a call request's description/quantity needed |
 | GET    | `/call-requests/:id`   | Admin | See invite status + accept/decline/cancel tally |
 | POST   | `/call-requests/:id/copy`     | Admin | Copy a call request to other upcoming shoot days |
 | GET    | `/invites/me`          | Extra | View your invites                         |
 | PATCH  | `/invites/:id`         | Extra | Accept, decline, or cancel (after accepting) an invite |
-| GET    | `/invites/tally/me`    | Extra | View your own lifetime worked/declined/cancelled tally |
-| GET    | `/invites/tally/:extraProfileId` | Admin | View an extra's tally + 3-strikes flag for your production |
+| GET    | `/invites/tally/me`    | Extra | View your own lifetime worked/declined/cancelled/no-show tally |
+| GET    | `/invites/tally/:extraProfileId` | Admin | View an extra's tally + 3-strikes flag (cancellations + no-shows) for your production |
 | POST   | `/deletion-requests/me`          | Extra | Request your own account be deleted        |
 | DELETE | `/deletion-requests/me`          | Extra | Cancel your own pending deletion request    |
 | POST   | `/deletion-requests/:id`         | Admin | Initiate a deletion request for an extra    |
@@ -244,7 +267,8 @@ All admin routes are scoped to the coordinator's own production.
   soft-delete flag once one is approved; also records when they last opened each
   notification screen (used for the red badges)
 - `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
-  availability, photos, smartphone yes/no, encrypted IBAN/BIC; linked to productions via `extra_productions`
+  availability, photos, smartphone yes/no, encrypted IBAN/BIC + account holder name;
+  linked to productions via `extra_productions`
 - `extra_productions` — an extra's membership of a production: PENDING (asked to join),
   APPROVED (can be matched and invited) or DENIED, plus who reviewed it and when
 - `locations` — a production's saved meeting points (name, address, optional map pin)
@@ -253,7 +277,8 @@ All admin routes are scoped to the coordinator's own production.
 - `call_requests` — a need for a shoot day, with matching criteria (age
   range, gender, skills) and quantity needed
 - `call_invites` — the link between a call request and a matched extra,
-  tracking pending/accepted/declined/cancelled/expired status
+  tracking pending/accepted/declined/cancelled/expired/no-show status, plus the
+  extra's finish time on the day (for payroll)
 
 See `prisma/schema.prisma` for the full schema.
 
@@ -320,7 +345,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 8 — Notification badges (new invites for extras; new deletion/production requests for coordinators)
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 9 — Excel export
+- [x] Part 9 — Attendance (no-shows + finish times) + payroll export to Excel
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 10 — Email setup + forgot password
 - [ ] Part 11 — Email invites + email notifications for extras without a smartphone
 - [ ] Part 12 — Code reorganisation (hooks/navigation, API layer, shared theme + components)
