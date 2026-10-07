@@ -20,14 +20,16 @@ based on firsthand experience working as a film extra.
 - **Maps:** Google Maps Platform — Maps SDK (in-app map), Places API (search) and
   Geocoding API (pin → address), the last two called server-side so the key stays private
 - **Excel export:** exceljs (server-side), shared from the app with react-native-blob-util + react-native-share
+- **Email:** Nodemailer through Brevo's SMTP relay (password reset codes and security emails)
 
 ## Status
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
-🔄 Phase 3 in progress — Parts 1–9 complete (multi-production support; meeting points, wrap time + Google Maps;
+🔄 Phase 3 in progress — Parts 1–10 complete (multi-production support; meeting points, wrap time + Google Maps;
 date of birth; smartphone + encrypted bank details; realistic seed data with generated photos; name search;
-production join requests with coordinator approval; notification badges; attendance + payroll export to Excel).
+production join requests with coordinator approval; notification badges; attendance + payroll export to Excel;
+email + forgot/change password).
 
 ## Screenshots
 
@@ -157,6 +159,24 @@ production join requests with coordinator approval; notification badges; attenda
 - No-shows are a new invite status: shown to the extra, counted in both tallies, and
   counted towards the 3-strikes flag alongside cancellations
 
+**Part 10 – Email + forgot/change password ✅**
+- Email sending with Nodemailer through Brevo's SMTP relay, using a shared branded layout
+  (with a plain-text version too)
+- Forgot password: a 6-digit code is emailed (generated with `crypto.randomInt`, stored only
+  as a bcrypt hash). It works once, expires after 15 minutes, is cancelled after 5 wrong
+  guesses, and only one code can be sent per minute
+- The reply is the same whether or not the email has an account, so the form can't be used
+  to find out who's signed up
+- Change password from the hamburger menu (needs the current password)
+- After any password change: a "your password was changed" email, and every other phone is
+  logged out. Each user stores `passwordChangedAt`, and login tokens issued before it are
+  rejected; the app catches this and goes back to login with a message. The phone that made
+  the change gets a fresh token and stays logged in
+- Password rules based on NIST guidance: 10–64 characters, at least one letter and one number,
+  common passwords blocked, and no name or email in it. Checked whenever a password is set
+  (sign-up, reset, change), never at login. The app shows a live checklist as you type
+- Also: redesigned login screen with a "Forgot password?" link and success/error messages
+
 ## Getting started
 
 1. Install dependencies:
@@ -172,15 +192,23 @@ production join requests with coordinator approval; notification badges; attenda
 ```
    cp .env.example .env
 ```
-3. Create the database tables:
+3. For email, add your Brevo SMTP details to `.env`: `SMTP_HOST`, `SMTP_PORT`,
+   `SMTP_USER`, `SMTP_PASS` (a Brevo SMTP key), `EMAIL_FROM_ADDRESS` (a sender
+   you've verified in Brevo) and `EMAIL_FROM_NAME`. Brevo SMTP keys stop working
+   after 90 days without use. Check it works by sending a test email (leave the
+   address out to send it to `EMAIL_FROM_ADDRESS`):
+```
+   node scripts/sendTestEmail.js you@example.com
+```
+4. Create the database tables:
 ```
    npx prisma migrate dev --name init
 ```
-4. Start the dev server:
+5. Start the dev server:
 ```
    npm run dev
 ```
-5. Check it's running:
+6. Check it's running:
 ```
    curl http://localhost:4000/health
 ```
@@ -204,7 +232,10 @@ production join requests with coordinator approval; notification badges; attenda
   times (one extra released early, one kept late); extra1's bank account is a joint account
   ("Jordan & Sam Lee") to show a different account holder name
 
-All passwords are `password123`.
+All passwords are `password123`. This deliberately doesn't meet the password rules (they
+only apply when a password is set, not at login), so it's quick to type while testing.
+The `@example.com` addresses can't receive email, so to test forgot password, change a
+test account's email to one you can read first.
 
 The seed needs `firebase-service-account.json` in the backend folder and `FIREBASE_STORAGE_BUCKET` in `.env`. It deletes all photos under `profile-photos/` in Firebase Storage before uploading new ones.
 
@@ -215,8 +246,11 @@ All admin routes are scoped to the coordinator's own production.
 
 | Method | Route                  | Who   | Description                              |
 |--------|-------------------------|-------|-------------------------------------------|
-| POST   | `/auth/register`       | Any   | Create an account (ADMIN or EXTRA)        |
+| POST   | `/auth/register`       | Any   | Create an account (ADMIN or EXTRA); the password must meet the password rules        |
 | POST   | `/auth/login`          | Any   | Log in, get a JWT                         |
+| POST   | `/auth/forgot-password` | Any  | Email a 6-digit reset code (same reply whether or not the account exists) |
+| POST   | `/auth/reset-password`  | Any  | Set a new password with the emailed code; logs out every device |
+| POST   | `/auth/change-password` | Any (logged in) | Change your password (needs the current one); logs out other devices and returns a fresh token |
 | GET    | `/profiles/me`         | Extra | View your own profile                     |
 | PATCH  | `/profiles/me`         | Extra | Update your own profile (date of birth, photos, skills, bank details + account holder name, etc.) |
 | PATCH  | `/profiles/me/productions` | Extra | Set the productions you want: new ones become join requests, unticked ones are left/cancelled (must keep one approved; blocked if booked on an upcoming shoot) |
@@ -265,7 +299,8 @@ All admin routes are scoped to the coordinator's own production.
 - `users` — accounts, either ADMIN (coordinator, belongs to one production) or EXTRA;
   tracks an optional pending deletion request (self- or admin-initiated) and a
   soft-delete flag once one is approved; also records when they last opened each
-  notification screen (used for the red badges)
+  notification screen (used for the red badges), a hashed password reset code with its
+  expiry and wrong-guess count, and when the password was last changed (older logins are rejected)
 - `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
   availability, photos, smartphone yes/no, encrypted IBAN/BIC + account holder name;
   linked to productions via `extra_productions`
@@ -348,7 +383,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 9 — Attendance (no-shows + finish times) + payroll export to Excel
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 10 — Email setup + forgot password
+- [x] Part 10 — Email setup (Brevo) + forgot/change password, password rules, log out other devices
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 11 — Email invites + email notifications for extras without a smartphone
 - [ ] Part 12 — Code reorganisation (hooks/navigation, API layer, shared theme + components)
 - [ ] Part 13 — Screenshots of all screens and workflows
