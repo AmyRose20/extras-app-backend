@@ -1,6 +1,6 @@
 const prisma = require('../config/db');
-require('../config/firebase'); // initializes the Firebase app
-const { getMessaging } = require('firebase-admin/messaging');
+const { notifyExtras, EXTRA_WITH_USER, newLinkToken } = require('../utils/notify');
+const { buildShootDayChangedEmail } = require('../utils/inviteEmails');
 
 // Include this on shoot day queries so responses carry the production's name.
 const PRODUCTION_SELECT = { select: { id: true, name: true } };
@@ -321,7 +321,9 @@ async function updateShootDay(req, res) {
   }
 }
 
-// Expects shootDay to include production.
+// Tells extras who've accepted a call on this shoot day what changed. Expects shootDay to include production.
+//   - smartphone: push alert
+//   - no smartphone: email with the full updated details + a fresh Cancel link (Phase 3 Part 11)
 async function sendShootDayUpdateNotifications(shootDay, changes) {
   try {
     const acceptedInvites = await prisma.callInvite.findMany({
@@ -329,27 +331,31 @@ async function sendShootDayUpdateNotifications(shootDay, changes) {
         status: 'ACCEPTED',
         callRequest: { shootDayId: shootDay.id },
       },
-      include: { extraProfile: true },
+      include: { extraProfile: { include: EXTRA_WITH_USER }, callRequest: true },
     });
 
-    const tokens = acceptedInvites
-      .map((invite) => invite.extraProfile.fcmToken)
-      .filter((token) => !!token);
+    // Someone could be accepted on two call requests for the same day, so only tell each extra once
+    // (keyed by extra, keeping their first invite for the email's Cancel link)
+    const inviteByExtra = new Map();
+    acceptedInvites.forEach((invite) => {
+      if (!inviteByExtra.has(invite.extraProfileId)) inviteByExtra.set(invite.extraProfileId, invite);
+    });
+    const extras = [...inviteByExtra.values()].map((invite) => invite.extraProfile);
 
-    if (tokens.length === 0) {
-      return;
-    }
-
-    const message = {
-      notification: {
-        title: 'Shoot day updated',
-        body: `${shootDay.production.name} (${formatDateForMessage(shootDay.date)}) updated: ${changes.join(', ')}`,
+    await notifyExtras(extras, {
+      title: 'Shoot day updated',
+      body: `${shootDay.production.name} (${formatDateForMessage(shootDay.date)}) updated: ${changes.join(', ')}`,
+      buildEmail: async (extra) => {
+        const invite = inviteByExtra.get(extra.id);
+        const { token, tokenHash } = newLinkToken();
+        await prisma.callInvite.update({
+          where: { id: invite.id },
+          data: { responseTokenHash: tokenHash },
+        });
+        // The invite's call request, with the UPDATED shoot day (new time/meeting point)
+        return buildShootDayChangedEmail(extra, { ...invite.callRequest, shootDay }, token, changes);
       },
-      tokens,
-    };
-
-    const response = await getMessaging().sendEachForMulticast(message);
-    console.log(`Push sent: ${response.successCount} succeeded, ${response.failureCount} failed`);
+    });
   } catch (err) {
     console.error('Error sending shoot day update notifications:', err);
   }

@@ -1,6 +1,5 @@
 const prisma = require('../config/db');
-require('../config/firebase'); // initializes the Firebase app
-const { getMessaging } = require('firebase-admin/messaging');
+const { notifyExtra } = require('../utils/notify');
 const { ageFromDob, dobFilterForAgeRange } = require('../utils/age');
 const { encrypt, decrypt } = require('../utils/crypto');
 const { normaliseIban, isValidIban, normaliseBic, isValidBic, maskIban } = require('../utils/bankDetails');
@@ -492,7 +491,10 @@ async function removeExtraFromMyProduction(req, res) {
 
     const profile = await prisma.extraProfile.findFirst({
       where: { id, memberships: { some: { productionId, status: 'APPROVED' } } },
-      include: { memberships: { where: { status: 'APPROVED' }, ...MEMBERSHIP_WITH_PRODUCTION } },
+        include: {
+        memberships: { where: { status: 'APPROVED' }, ...MEMBERSHIP_WITH_PRODUCTION },
+        user: { select: { name: true, email: true } }, // for the email, if they have no smartphone
+      },
     });
     if (!profile) {
       return res.status(404).json({ error: 'Profile not found' });
@@ -522,19 +524,10 @@ async function removeExtraFromMyProduction(req, res) {
       }),
     ]);
 
-    if (profile.fcmToken) {
-      try {
-        await getMessaging().send({
-          token: profile.fcmToken,
-          notification: {
-            title: 'Production update',
-            body: `You've been removed from ${production.name}.`,
-          },
-        });
-      } catch (pushErr) {
-        console.error('Error sending removal notification:', pushErr);
-      }
-    }
+    await notifyExtra(profile, {
+      title: 'Production update',
+      body: `You've been removed from ${production.name}.`,
+    });
 
     return res.json({ message: `Removed from ${production.name}` });
   } catch (err) {

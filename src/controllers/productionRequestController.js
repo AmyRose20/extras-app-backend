@@ -1,6 +1,5 @@
 const prisma = require('../config/db');
-require('../config/firebase'); // initializes the Firebase app
-const { getMessaging } = require('firebase-admin/messaging');
+const { notifyExtra, EXTRA_WITH_USER } = require('../utils/notify');
 const { ageFromDob } = require('../utils/age');
 
 // Coordinators approve or deny extras' requests to join THEIR production.
@@ -15,16 +14,6 @@ function requireProduction(req, res) {
     return null;
   }
   return req.user.productionId;
-}
-
-// Push notification to the extra (skipped if they have no device token)
-async function notifyExtra(fcmToken, title, body) {
-  if (!fcmToken) return;
-  try {
-    await getMessaging().send({ token: fcmToken, notification: { title, body } });
-  } catch (err) {
-    console.error('Error sending production request notification:', err);
-  }
 }
 
 // GET /production-requests — an ADMIN lists PENDING requests to join their production.
@@ -91,7 +80,7 @@ async function reviewRequest(req, res, newStatus) {
       where: { id, productionId, status: 'PENDING' },
       include: {
         production: { select: { name: true } },
-        extraProfile: { select: { fcmToken: true } },
+        extraProfile: { include: EXTRA_WITH_USER },
       },
     });
     if (!request) {
@@ -105,17 +94,15 @@ async function reviewRequest(req, res, newStatus) {
 
     const productionName = request.production.name;
     if (newStatus === 'APPROVED') {
-      await notifyExtra(
-        request.extraProfile.fcmToken,
-        'Request approved',
-        `You've been added to ${productionName}. You'll now get calls for it.`
-      );
+      await notifyExtra(request.extraProfile, {
+        title: 'Request approved',
+        body: `You've been added to ${productionName}. You'll now get calls for it.`,
+      });
     } else {
-      await notifyExtra(
-        request.extraProfile.fcmToken,
-        'Production request',
-        `Your request to join ${productionName} wasn't approved this time.`
-      );
+      await notifyExtra(request.extraProfile, {
+        title: 'Production request',
+        body: `Your request to join ${productionName} wasn't approved this time.`,
+      });
     }
 
     return res.json({ id: updated.id, status: updated.status });

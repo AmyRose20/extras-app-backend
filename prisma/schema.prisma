@@ -54,6 +54,7 @@ model Production {
   extraMemberships ExtraProduction[] // extras' memberships of this production
   shootDays        ShootDay[]
   locations        Location[]
+  signupInvites    SignupInvite[] // sign-up links sent by this production's coordinators (Part 11)
 
   @@map("productions")
 }
@@ -158,6 +159,11 @@ model ExtraProfile {
   ibanEncrypted    String? // encrypted with BANK_DETAILS_ENCRYPTION_KEY, never stored as plain text
   bicEncrypted     String?
   accountHolderName String? // name on the bank account, exactly as the bank has it (required whenever IBAN/BIC are set)
+  
+  // "Update my details" link for extras without a smartphone (Part 11).
+  // Only the SHA-256 hash of the link's code is stored; links last 1 hour and are cleared once used.
+  detailsLinkHash      String?   @unique
+  detailsLinkExpiresAt DateTime?
 
   invites     CallInvite[]
   memberships ExtraProduction[] // which productions this extra is on (pending/approved/denied)
@@ -216,8 +222,30 @@ model CallInvite {
   sentAt      DateTime     @default(now())
   respondedAt DateTime?
   finishedAt  DateTime? // when this extra was released on the day (set by the coordinator; starts as the shoot day's estimated wrap)
+  
+  // Email answer links (Part 11): for extras without a smartphone, the Accept/Decline/Cancel
+  // links in their emails carry a long random code. Only its SHA-256 hash is stored here.
+  responseTokenHash String? @unique
 
   // One extra should only be invited once per call request
   @@unique([callRequestId, extraProfileId])
   @@map("call_invites")
+}
+
+// A sign-up link a coordinator emailed to a new extra (Part 11).
+// Whoever signs up through it gets an APPROVED membership of that production straight away.
+model SignupInvite {
+  id              String     @id @default(uuid())
+  email           String // who it was sent to
+  productionId    String
+  production      Production @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  invitedById     String // the coordinator who sent it (User.id is a UUID string)
+  tokenHash       String?    @unique // SHA-256 hash of the code in the link (null when no link was needed)
+  expiresAt       DateTime // links work for 7 days
+  usedAt          DateTime? // when someone signed up with it (or was added, if they already had an account)
+  usedByUserId    String?
+  existingAccount Boolean    @default(false) // true = they already had an account, so the production was just added
+  createdAt       DateTime   @default(now())
+
+  @@map("signup_invites")
 }

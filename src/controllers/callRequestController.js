@@ -1,6 +1,6 @@
 const prisma = require('../config/db');
-require('../config/firebase'); // initializes the Firebase app
-const { getMessaging } = require('firebase-admin/messaging');
+const { notifyExtras, EXTRA_WITH_USER, newLinkToken } = require('../utils/notify');
+const { buildInviteEmail } = require('../utils/inviteEmails');
 const { dobFilterForAgeRange } = require('../utils/age');
 
 // Every coordinator must be linked to a production. Returns the
@@ -59,7 +59,7 @@ async function createCallRequest(req, res) {
         skipDuplicates: true,
       });
 
-      await sendPushNotifications(matchedExtras, callRequest);
+    await notifyMatchedExtras(matchedExtras, callRequest);
     }
 
     return res.status(201).json({
@@ -73,33 +73,29 @@ async function createCallRequest(req, res) {
   }
 }
 
-// Sends a push notification to each matched extra who has a saved FCM token.
-// Extras without a token yet (haven't opened the app, denied permission, etc.)
-// are just skipped — no error, since this is expected for some users.
-async function sendPushNotifications(matchedExtras, callRequest) {
-  const tokens = matchedExtras
-    .map((extra) => extra.fcmToken)
-    .filter((token) => token != null && token !== '');
+// Tells each matched extra about the new call request (Phase 3 Part 11):
+//   - smartphone: a push alert
+//   - no smartphone: an email with Accept / Decline buttons. Each invite gets its own
+//     random code for those links; only the code's hash is saved on the invite.
+async function notifyMatchedExtras(matchedExtras, callRequest) {
+  // The email shows the date, times and meeting point, so load the shoot day + production
+  const fullCallRequest = await prisma.callRequest.findUnique({
+    where: { id: callRequest.id },
+    include: { shootDay: { include: { production: { select: { name: true } } } } },
+  });
 
-  if (tokens.length === 0) {
-    console.log('No FCM tokens to send to for this call request');
-    return;
-  }
-
-  const message = {
-    notification: {
-      title: 'New Call Request',
-      body: callRequest.description,
+  await notifyExtras(matchedExtras, {
+    title: 'New Call Request',
+    body: callRequest.description,
+    buildEmail: async (extra) => {
+      const { token, tokenHash } = newLinkToken();
+      await prisma.callInvite.update({
+        where: { callRequestId_extraProfileId: { callRequestId: callRequest.id, extraProfileId: extra.id } },
+        data: { responseTokenHash: tokenHash },
+      });
+      return buildInviteEmail(extra, fullCallRequest, token);
     },
-    tokens,
-  };
-
-  try {
-    const response = await getMessaging().sendEachForMulticast(message);
-    console.log(`Push sent: ${response.successCount} succeeded, ${response.failureCount} failed`);
-  } catch (error) {
-    console.error('Error sending push notifications:', error);
-  }
+  });
 }
 
 // Finds extra profiles matching the given criteria, limited to extras
@@ -119,6 +115,7 @@ async function findMatchingExtras(criteria, productionId) {
         deletionRequestStatus: { not: 'PENDING' },
       },
     },
+    include: EXTRA_WITH_USER, // name + email, for email invites
   });
 }
 
@@ -140,6 +137,7 @@ async function getCallRequestStatus(req, res) {
               // only the fields the responses screens need — no bank details or push tokens
               select: {
                 id: true,
+                hasSmartphone: true, // the app shows an "Email" tag for extras without one
                 user: { select: { id: true, name: true, email: true, phone: true } },
               },
             },
@@ -272,7 +270,7 @@ async function copyCallRequest(req, res) {
           })),
           skipDuplicates: true,
         });
-        await sendPushNotifications(matchedExtras, copy);
+      await notifyMatchedExtras(matchedExtras, copy);
       }
 
       results.push({

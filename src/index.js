@@ -14,11 +14,16 @@ const productionRoutes = require('./routes/production.routes');
 const locationRoutes = require('./routes/location.routes');
 const geocodeRoutes = require('./routes/geocode.routes');
 const placesRoutes = require('./routes/places.routes');
+const emailLinkRoutes = require('./routes/emailLink.routes');
+const signupInviteRoutes = require('./routes/signupInvite.routes');
+const signupRoutes = require('./routes/signup.routes');
+const detailsRoutes = require('./routes/details.routes');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // reads forms posted from the web pages (email answers, sign-up)
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -36,6 +41,10 @@ app.use('/productions', productionRoutes);
 app.use('/locations', locationRoutes);
 app.use('/geocode', geocodeRoutes);
 app.use('/places', placesRoutes);
+app.use('/email', emailLinkRoutes);
+app.use('/signup-invites', signupInviteRoutes);
+app.use('/signup', signupRoutes);
+app.use('/details', detailsRoutes);
 
 // Basic 404 handler
 app.use((req, res) => {

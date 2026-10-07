@@ -5,6 +5,16 @@ const prisma = require('../config/db');
 const STRIKES_WINDOW_DAYS = 90;
 const THREE_STRIKES_THRESHOLD = 3;
 
+// Which status an invite can move to, based on its current status.
+// PENDING -> ACCEPTED/DECLINED covers the initial response.
+// ACCEPTED -> CANCELLED covers backing out after already accepting.
+// (NO_SHOW is only ever set by a coordinator, on the Attendance screen.)
+// Shared with the email answer pages (emailLinkController.js) so both follow the same rules.
+const VALID_TRANSITIONS = {
+  PENDING: ['ACCEPTED', 'DECLINED'],
+  ACCEPTED: ['CANCELLED'],
+};
+
 // Every coordinator must be linked to a production. Returns the
 // productionId, or sends a 403 and returns null if they aren't linked.
 function requireProduction(req, res) {
@@ -51,14 +61,6 @@ async function respondToInvite(req, res) {
   const { id } = req.params;
   const { status } = req.body;
 
-  // Which status an invite can move to, based on its current status.
-  // PENDING -> ACCEPTED/DECLINED covers the initial response.
-  // ACCEPTED -> CANCELLED covers backing out after already accepting.
-  // (NO_SHOW is only ever set by a coordinator, on the Attendance screen.)
-  const VALID_TRANSITIONS = {
-    PENDING: ['ACCEPTED', 'DECLINED'],
-    ACCEPTED: ['CANCELLED'],
-  };
   const ALL_STATUSES = Object.values(VALID_TRANSITIONS).flat();
 
   if (!ALL_STATUSES.includes(status)) {
@@ -190,4 +192,4 @@ async function getExtraTally(req, res) {
   }
 }
 
-module.exports = { getMyInvites, respondToInvite, getMyTally, getExtraTally };
+module.exports = { getMyInvites, respondToInvite, getMyTally, getExtraTally, VALID_TRANSITIONS };
