@@ -20,16 +20,17 @@ based on firsthand experience working as a film extra.
 - **Maps:** Google Maps Platform — Maps SDK (in-app map), Places API (search) and
   Geocoding API (pin → address), the last two called server-side so the key stays private
 - **Excel export:** exceljs (server-side), shared from the app with react-native-blob-util + react-native-share
-- **Email:** Nodemailer through Brevo's SMTP relay (password reset codes and security emails)
+- **Email:** Nodemailer through Brevo's SMTP relay (password reset codes, security emails, and invites + updates for extras without a smartphone)
+- **Web pages:** simple server-rendered pages (sign-up, accept/decline from email, update details), styled to match the app; photo uploads with multer + sharp
 
 ## Status
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
-🔄 Phase 3 in progress — Parts 1–10 complete (multi-production support; meeting points, wrap time + Google Maps;
+🔄 Phase 3 in progress — Parts 1–11 complete (multi-production support; meeting points, wrap time + Google Maps;
 date of birth; smartphone + encrypted bank details; realistic seed data with generated photos; name search;
 production join requests with coordinator approval; notification badges; attendance + payroll export to Excel;
-email + forgot/change password).
+email + forgot/change password; email invites + sign-up links for extras without a smartphone).
 
 ## Screenshots
 
@@ -177,6 +178,21 @@ email + forgot/change password).
   (sign-up, reset, change), never at login. The app shows a live checklist as you type
 - Also: redesigned login screen with a "Forgot password?" link and success/error messages
 
+**Part 11 – Email invites + sign-up links ✅**
+- Extras without a smartphone get everything by email instead of push: call invites, "you're booked",
+  shoot day changes and production updates. One helper decides push or email for each extra
+- Accept, decline or cancel straight from the email. Links open a confirm page first (some email apps
+  open links by themselves to scan them), use the same rules as the app, and carry a one-off random code
+  stored only as a SHA-256 hash
+- Coordinators send sign-up invite links from the app (single use, 7 days). Signing up gives an approved
+  membership of that production straight away; if the email already has an account, the production is just added
+- Web sign-up page: with a smartphone, choose a password and use the app; without one, fill in your
+  details (skills, languages, availability, optional photos and bank details) on the page
+- "Update my details" by emailed link (single use, 1 hour), with a "your details were changed" email
+  afterwards and a clear warning if bank details changed
+- Web pages styled like the app (dusk gradient, glass cards, gold buttons, dropdown multi-selects)
+- Also: "Email" tags on the responses lists, pull-to-refresh on Invite Extras and the responses lists
+
 ## Getting started
 
 1. Install dependencies:
@@ -199,6 +215,9 @@ email + forgot/change password).
    address out to send it to `EMAIL_FROM_ADDRESS`):
 ```
    node scripts/sendTestEmail.js you@example.com
+```
+Also set `APP_BASE_URL` (e.g. `http://localhost:4000`). It's used to build the links in emails
+(accept/decline, sign-up, update details). Locally those links only open on the computer running the backend.
 ```
 4. Create the database tables:
 ```
@@ -292,6 +311,19 @@ All admin routes are scoped to the coordinator's own production.
 | GET    | `/geocode/reverse`            | Admin | Turn a map pin into an address (server-side Google key) |
 | GET    | `/places/autocomplete`        | Admin | Place suggestions as you type (server-side Google key) |
 | GET    | `/places/details/:placeId`    | Admin | Exact location + address for a chosen place |
+| POST   | `/signup-invites`             | Admin | Email a sign-up link for your production (or add the production straight away if the email already has an account) |
+| GET    | `/signup-invites`             | Admin | Sign-up invites you've sent, with status (waiting, signed up, added, expired) |
+
+## Web pages
+
+Opened from links in emails, in any browser. No login: the one-off code in the link is the proof.
+
+| Page | What it's for |
+|------|----------------|
+| `/email/invite/:code` | Accept, decline or cancel a call (confirm page first) |
+| `/signup/:code` | Sign up from a coordinator's invite (smartphone: set a password; no smartphone: fill in details) |
+| `/details` | Ask for a link to update your details (extras without a smartphone) |
+| `/details/:code` | Update your details (filled in already; photos and bank details optional) |
 
 ## Data model
 
@@ -302,8 +334,8 @@ All admin routes are scoped to the coordinator's own production.
   notification screen (used for the red badges), a hashed password reset code with its
   expiry and wrong-guess count, and when the password was last changed (older logins are rejected)
 - `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
-  availability, photos, smartphone yes/no, encrypted IBAN/BIC + account holder name;
-  linked to productions via `extra_productions`
+  availability, photos, smartphone yes/no, encrypted IBAN/BIC + account holder name, and a hashed
+  one-hour "update my details" link code; linked to productions via `extra_productions`
 - `extra_productions` — an extra's membership of a production: PENDING (asked to join),
   APPROVED (can be matched and invited) or DENIED, plus who reviewed it and when
 - `locations` — a production's saved meeting points (name, address, optional map pin)
@@ -311,9 +343,9 @@ All admin routes are scoped to the coordinator's own production.
   and meeting point (name, address, optional map pin)
 - `call_requests` — a need for a shoot day, with matching criteria (age
   range, gender, skills) and quantity needed
-- `call_invites` — the link between a call request and a matched extra,
-  tracking pending/accepted/declined/cancelled/expired/no-show status, plus the
-  extra's finish time on the day (for payroll)
+- `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
+  availability, photos, smartphone yes/no, encrypted IBAN/BIC + account holder name, and a hashed
+  one-hour "update my details" link code; linked to productions via `extra_productions`
 
 See `prisma/schema.prisma` for the full schema.
 
@@ -386,7 +418,9 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 10 — Email setup (Brevo) + forgot/change password, password rules, log out other devices
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 11 — Email invites + email notifications for extras without a smartphone
+- [x] Part 11 — Email invites + notifications for extras without a smartphone, sign-up invite links, update-details pages
+  - [x] Functionality
+  - [x] UI polish
 - [ ] Part 12 — Code reorganisation (hooks/navigation, API layer, shared theme + components)
 - [ ] Part 13 — Screenshots of all screens and workflows
 
@@ -396,9 +430,8 @@ MIT
 
 ## Stretch goals
 
-- **Admin-created profiles for extras without smartphones** — some extras (e.g. older
-  participants without a smartphone) can't self-register or use the app. A coordinator
-  could create a profile on their behalf (name, phone, age, skills) so they're still
-  included in matching.
+- **Coordinator edits for extras without smartphones** — extras without a smartphone can
+  sign up and update their details on the web (Part 11); a coordinator could also edit
+  them in the app when an extra phones in a change.
 - **SMS fallback** — for profiles without app access, send an SMS (via Twilio) instead
   of a push notification when matched, with a simple YES/NO reply to accept/decline.
