@@ -14,13 +14,23 @@ async function requireAuth(req, res, next) {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Reject tokens belonging to an account that's since been deleted
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { deletedAt: true, productionId: true },
+      select: { deletedAt: true, productionId: true, passwordChangedAt: true },
     });
+
+    // Reject tokens belonging to an account that's since been deleted
     if (!user || user.deletedAt) {
       return res.status(401).json({ error: 'This account no longer exists' });
+    }
+
+    // Reject logins from before the password was last changed ("log out other devices").
+    // payload.iat = when the token was issued, in seconds.
+    if (user.passwordChangedAt && payload.iat * 1000 < user.passwordChangedAt.getTime()) {
+      return res.status(401).json({
+        error: 'Your password was changed. Please log in again.',
+        code: 'PASSWORD_CHANGED',
+      });
     }
 
     // productionId is set for coordinators (ADMIN), null for extras

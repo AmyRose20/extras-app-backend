@@ -126,6 +126,14 @@ model User {
   invitesLastSeenAt            DateTime @default(now()) // extras: My Invites
   deletionRequestsLastSeenAt   DateTime @default(now()) // coordinators: Deletion Requests
   productionRequestsLastSeenAt DateTime @default(now()) // coordinators: Production Requests
+  
+  // Forgot password (Phase 3 Part 10): one active reset code at a time
+  resetCodeHash      String?   // bcrypt hash of the 6-digit code (never stored as plain text)
+  resetCodeExpiresAt DateTime? // codes last 15 minutes
+  resetCodeAttempts  Int       @default(0) // wrong guesses; the code is cancelled after 5
+
+  // Log out other devices: logins (tokens) issued before this time stop working
+  passwordChangedAt  DateTime?
 
   @@map("users")
 }

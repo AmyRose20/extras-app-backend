@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
 const { getAuth } = require('firebase-admin/auth');
 const firebaseApp = require('../config/firebase');
+const { checkPassword } = require('../utils/passwordRules');
 
 const SALT_ROUNDS = 10;
 
@@ -15,6 +16,10 @@ async function register(req, res) {
     }
     if (!['ADMIN', 'EXTRA'].includes(role)) {
       return res.status(400).json({ error: 'role must be ADMIN or EXTRA' });
+    }
+    const passwordError = checkPassword(password, { name, email });
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -96,4 +101,4 @@ function toPublicUser(user) {
   return publicUser;
 }
 
-module.exports = { register, login };
+module.exports = { register, login, signToken };
