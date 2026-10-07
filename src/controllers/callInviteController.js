@@ -1,8 +1,8 @@
 const prisma = require('../config/db');
 
 // Config for the 3-strikes flag: how many days back counts as "recent",
-// and how many recent cancellations trigger the flag.
-const CANCEL_WINDOW_DAYS = 90;
+// and how many recent cancellations + no-shows trigger the flag.
+const STRIKES_WINDOW_DAYS = 90;
 const THREE_STRIKES_THRESHOLD = 3;
 
 // Every coordinator must be linked to a production. Returns the
@@ -54,6 +54,7 @@ async function respondToInvite(req, res) {
   // Which status an invite can move to, based on its current status.
   // PENDING -> ACCEPTED/DECLINED covers the initial response.
   // ACCEPTED -> CANCELLED covers backing out after already accepting.
+  // (NO_SHOW is only ever set by a coordinator, on the Attendance screen.)
   const VALID_TRANSITIONS = {
     PENDING: ['ACCEPTED', 'DECLINED'],
     ACCEPTED: ['CANCELLED'],
@@ -94,19 +95,20 @@ async function respondToInvite(req, res) {
 }
 
 // Shared helper — builds the lifetime tally for one extra profile.
-// "worked" = ACCEPTED invites for shoot days that have already happened.
-// "declined" / "cancelled" = lifetime totals of those statuses.
-// "threeStrikes" = true if CANCELLED count in the last CANCEL_WINDOW_DAYS
-// days is at or above THREE_STRIKES_THRESHOLD.
+// "worked"    = ACCEPTED invites for shoot days that have already happened
+//               (no-shows are NO_SHOW, so they're not counted as worked).
+// "declined" / "cancelled" / "noShows" = lifetime totals of those statuses.
+// "threeStrikes" = true if recent cancellations + recent no-shows
+// (in the last STRIKES_WINDOW_DAYS days) reach THREE_STRIKES_THRESHOLD.
 // If productionId is given, only invites for that production are counted
 // (coordinator view). If not, all productions are counted (extra's own view).
 async function buildTally(extraProfileId, productionId = null) {
-  const windowStart = new Date(Date.now() - CANCEL_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const windowStart = new Date(Date.now() - STRIKES_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   // Added to every count below when we're limiting to one production
   const productionFilter = productionId ? { productionId } : {};
 
-  const [worked, declined, cancelled, recentCancelled] = await Promise.all([
+  const [worked, declined, cancelled, noShows, recentCancelled, recentNoShows] = await Promise.all([
     prisma.callInvite.count({
       where: {
         extraProfileId,
@@ -115,19 +117,15 @@ async function buildTally(extraProfileId, productionId = null) {
       },
     }),
     prisma.callInvite.count({
-      where: {
-        extraProfileId,
-        status: 'DECLINED',
-        callRequest: { shootDay: productionFilter },
-      },
+      where: { extraProfileId, status: 'DECLINED', callRequest: { shootDay: productionFilter } },
     }),
     prisma.callInvite.count({
-      where: {
-        extraProfileId,
-        status: 'CANCELLED',
-        callRequest: { shootDay: productionFilter },
-      },
+      where: { extraProfileId, status: 'CANCELLED', callRequest: { shootDay: productionFilter } },
     }),
+    prisma.callInvite.count({
+      where: { extraProfileId, status: 'NO_SHOW', callRequest: { shootDay: productionFilter } },
+    }),
+    // Recent cancellation = cancelled (respondedAt) in the window
     prisma.callInvite.count({
       where: {
         extraProfileId,
@@ -136,13 +134,22 @@ async function buildTally(extraProfileId, productionId = null) {
         callRequest: { shootDay: productionFilter },
       },
     }),
+    // Recent no-show = the shoot day they missed was in the window
+    prisma.callInvite.count({
+      where: {
+        extraProfileId,
+        status: 'NO_SHOW',
+        callRequest: { shootDay: { date: { gte: windowStart }, ...productionFilter } },
+      },
+    }),
   ]);
 
   return {
     worked,
     declined,
     cancelled,
-    threeStrikes: recentCancelled >= THREE_STRIKES_THRESHOLD,
+    noShows,
+    threeStrikes: recentCancelled + recentNoShows >= THREE_STRIKES_THRESHOLD,
   };
 }
 

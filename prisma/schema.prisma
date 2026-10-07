@@ -30,6 +30,7 @@ enum InviteStatus {
   DECLINED
   CANCELLED
   EXPIRED
+  NO_SHOW // accepted, but didn't turn up on the day (marked by the coordinator)
 }
 
 enum DeletionRequestStatus {
@@ -148,6 +149,7 @@ model ExtraProfile {
   hasSmartphone    Boolean   @default(true) // false = gets call-request invites by email (Part 9)
   ibanEncrypted    String? // encrypted with BANK_DETAILS_ENCRYPTION_KEY, never stored as plain text
   bicEncrypted     String?
+  accountHolderName String? // name on the bank account, exactly as the bank has it (required whenever IBAN/BIC are set)
 
   invites     CallInvite[]
   memberships ExtraProduction[] // which productions this extra is on (pending/approved/denied)
@@ -205,6 +207,7 @@ model CallInvite {
   status      InviteStatus @default(PENDING)
   sentAt      DateTime     @default(now())
   respondedAt DateTime?
+  finishedAt  DateTime? // when this extra was released on the day (set by the coordinator; starts as the shoot day's estimated wrap)
 
   // One extra should only be invited once per call request
   @@unique([callRequestId, extraProfileId])

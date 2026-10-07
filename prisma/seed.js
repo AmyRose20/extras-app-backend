@@ -129,6 +129,10 @@ async function main() {
   });
 
   // ----- Extras (with photos and encrypted bank details) -----
+  // Bank account names that differ from the extra's own name (Phase 3 Part 9)
+  const ACCOUNT_NAMES = {
+    'extra1@example.com': 'Jordan & Sam Lee', // joint account
+  };
   console.log(`Creating ${extrasData.length} extras and uploading their photos...`);
   const extras = []; // { data, profileId } for each extra
   for (const [index, data] of extrasData.entries()) {
@@ -142,7 +146,12 @@ async function main() {
       if (!isValidIban(iban) || !isValidBic(bic)) {
         throw new Error(`Seed bank details for ${data.name} are not valid`);
       }
-      bankFields = { ibanEncrypted: encrypt(iban), bicEncrypted: encrypt(bic) };
+      bankFields = {
+        ibanEncrypted: encrypt(iban),
+        bicEncrypted: encrypt(bic),
+        // Name on the bank account: usually their own name, but some differ (e.g. a joint account)
+        accountHolderName: ACCOUNT_NAMES[data.email] ?? data.name,
+      };
     }
 
     const user = await prisma.user.create({
@@ -238,6 +247,7 @@ async function main() {
   //   upcoming day: first 2 ACCEPTED, then one DECLINED, the rest PENDING
   // Darragh Nolan cancels three Bloodaxe invites -> 3 strikes flag.
   const STRIKES_EMAIL = 'extra11@example.com';
+  const noShowDone = {}; // one no-show per production on a past shoot day (Part 9)
   let inviteCount = 0;
 
   async function callRequest(day, production, description, quantityNeeded, criteria) {
@@ -253,8 +263,8 @@ async function main() {
     // Sent a week before the shoot day (or yesterday, if that's still in the future)
     const sentAt = new Date(Math.min(day.date.getTime() - 7 * DAY, Date.now() - DAY));
     const respondedAt = new Date(Math.min(sentAt.getTime() + DAY, Date.now()));
-
     let accepted = 0;
+    let workedCount = 0; // for varying finish times on past days
     let other = 0;
     for (const extra of invited) {
       let status;
@@ -269,6 +279,21 @@ async function main() {
         status = other++ === 0 ? 'DECLINED' : 'PENDING';
       }
       if (status === 'ACCEPTED') accepted++;
+      
+      // Past shoot days (Part 9): the first person who worked each production becomes a no-show,
+      // and finish times vary — the next one was released 3 hours early, the next kept 1 hour late,
+      // everyone else finished at the estimated wrap (left empty = "estimate").
+      let finishedAt = null;
+      if (isPast && status === 'ACCEPTED') {
+        if (!noShowDone[production]) {
+          status = 'NO_SHOW';
+          noShowDone[production] = true;
+        } else if (day.estimatedWrapAt) {
+          workedCount++;
+          if (workedCount === 1) finishedAt = new Date(day.estimatedWrapAt.getTime() - 3 * 60 * 60 * 1000);
+          if (workedCount === 2) finishedAt = new Date(day.estimatedWrapAt.getTime() + 1 * 60 * 60 * 1000);
+        }
+      }
 
       await prisma.callInvite.create({
         data: {
@@ -277,6 +302,7 @@ async function main() {
           status,
           sentAt,
           respondedAt: status === 'PENDING' ? null : respondedAt,
+          finishedAt,
         },
       });
       inviteCount++;

@@ -25,7 +25,7 @@ function requireProduction(req, res) {
 //   showMasked = true  → the extra's own view: masked IBAN + BIC
 //   showMasked = false → coordinator view: just whether bank details exist
 function toSafeProfile(profile, { showMasked = false } = {}) {
-  const { ibanEncrypted, bicEncrypted, ...rest } = profile;
+  const { ibanEncrypted, bicEncrypted, accountHolderName, ...rest } = profile;
   const hasBankDetails = !!ibanEncrypted;
 
   const safe = { ...rest, age: ageFromDob(rest.dateOfBirth), hasBankDetails };
@@ -34,6 +34,7 @@ function toSafeProfile(profile, { showMasked = false } = {}) {
     safe.bankDetails = {
       ibanMasked: maskIban(decrypt(ibanEncrypted)),
       bic: decrypt(bicEncrypted),
+      accountHolderName: accountHolderName ?? null,
     };
   }
   return safe;
@@ -105,7 +106,7 @@ async function updateMyProfile(req, res) {
   try {
     const {
       dateOfBirth, gender, heightCm, skills, languages, phoneNumber, contactEmail,
-      availability, facePhotoUrl, fullBodyPhotoUrl, hasSmartphone, iban, bic,
+      availability, facePhotoUrl, fullBodyPhotoUrl, hasSmartphone, iban, bic, accountHolderName,
     } = req.body;
 
     // ----- Date of birth -----
@@ -126,18 +127,29 @@ async function updateMyProfile(req, res) {
     }
 
     // ----- Bank details -----
+    // IBAN, BIC and account holder name go together: all three are needed to pay an extra.
+    // Send all three to set them, IBAN + BIC as "" to remove them,
+    // or just accountHolderName to change the name only. Leave all out to keep what's saved.
     const bankData = {};
     if (iban !== undefined || bic !== undefined) {
       const ibanText = (iban ?? '').trim();
       const bicText = (bic ?? '').trim();
+      const nameText = (accountHolderName ?? '').trim();
 
       if (!ibanText && !bicText) {
-        // Both empty → remove bank details
+        // Both empty → remove bank details (and the account name with them)
         bankData.ibanEncrypted = null;
         bankData.bicEncrypted = null;
+        bankData.accountHolderName = null;
       } else {
         if (!ibanText || !bicText) {
           return res.status(400).json({ error: 'Please enter both your IBAN and BIC' });
+        }
+        if (!nameText) {
+          return res.status(400).json({ error: 'Please enter the account holder name' });
+        }
+        if (nameText.length > 70) {
+          return res.status(400).json({ error: 'The account holder name can be at most 70 characters' });
         }
         if (!isValidIban(ibanText)) {
           return res.status(400).json({ error: "That IBAN doesn't look right. Please check it." });
@@ -147,7 +159,19 @@ async function updateMyProfile(req, res) {
         }
         bankData.ibanEncrypted = encrypt(normaliseIban(ibanText));
         bankData.bicEncrypted = encrypt(normaliseBic(bicText));
+        bankData.accountHolderName = nameText;
       }
+
+    } else if (accountHolderName !== undefined) {
+      // Changing just the account holder name (IBAN/BIC stay as they are)
+      const nameText = (accountHolderName ?? '').trim();
+      if (!nameText) {
+        return res.status(400).json({ error: 'Please enter the account holder name' });
+      }
+      if (nameText.length > 70) {
+        return res.status(400).json({ error: 'The account holder name can be at most 70 characters' });
+      }
+      bankData.accountHolderName = nameText;
     }
 
     const updated = await prisma.extraProfile.update({
@@ -309,7 +333,7 @@ async function getBankDetails(req, res) {
 
     const profile = await prisma.extraProfile.findFirst({
       where: { id, memberships: { some: { productionId, status: 'APPROVED' } } },
-      select: { id: true, ibanEncrypted: true, bicEncrypted: true },
+      select: { id: true, ibanEncrypted: true, bicEncrypted: true, accountHolderName: true, user: { select: { name: true } } },
     });
 
     if (!profile) {
@@ -325,6 +349,8 @@ async function getBankDetails(req, res) {
     return res.json({
       iban: iban.replace(/(.{4})/g, '$1 ').trim(), // "IE29 AIBK 9311 5212 3456 78" (easier to read)
       bic: decrypt(profile.bicEncrypted),
+      // Fall back to their name for extras who added bank details before this field existed
+      accountHolderName: profile.accountHolderName ?? profile.user.name,
     });
   } catch (err) {
     console.error(err);
