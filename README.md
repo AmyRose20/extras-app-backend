@@ -218,7 +218,7 @@ email + forgot/change password; email invites + sign-up links for extras without
 ```
 Also set `APP_BASE_URL` (e.g. `http://localhost:4000`). It's used to build the links in emails
 (accept/decline, sign-up, update details). Locally those links only open on the computer running the backend.
-```
+
 4. Create the database tables:
 ```
    npx prisma migrate dev --name init
@@ -343,10 +343,7 @@ Opened from links in emails, in any browser. No login: the one-off code in the l
   and meeting point (name, address, optional map pin)
 - `call_requests` — a need for a shoot day, with matching criteria (age
   range, gender, skills) and quantity needed
-- `extra_profiles` — date of birth, gender, height, skills, languages, phone/contact email,
-  availability, photos, smartphone yes/no, encrypted IBAN/BIC + account holder name, and a hashed
-  one-hour "update my details" link code; linked to productions via `extra_productions`
-
+  
 See `prisma/schema.prisma` for the full schema.
 
 ## Roadmap — Phase 1 (functionality)
