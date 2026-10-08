@@ -26,7 +26,9 @@ based on firsthand experience working as a film extra.
 ## Status
 ✅ Phase 1 complete — all core functionality built and working end-to-end (auth, matching,
 push notifications, live status dashboard, edge case handling, seed data).
+
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
+
 🔄 Phase 3 in progress — Parts 1–11 complete (multi-production support; meeting points, wrap time + Google Maps;
 date of birth; smartphone + encrypted bank details; realistic seed data with generated photos; name search;
 production join requests with coordinator approval; notification badges; attendance + payroll export to Excel;
