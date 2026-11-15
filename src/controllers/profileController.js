@@ -213,7 +213,11 @@ async function updateFcmToken(req, res) {
   return res.json({ success: true });
 }
 
-// GET /profiles — an ADMIN listing extras on THEIR production (with optional filters)
+// GET /profiles — an ADMIN listing extras on THEIR production (with optional filters),
+// one page at a time: ?page=2&pageSize=10. Replies { extras, total, page, pageSize }.
+const DEFAULT_PAGE_SIZE = 10;
+const MAX_PAGE_SIZE = 50;
+
 async function listProfiles(req, res) {
   try {
     const { productionId } = req.user; // the requireProduction middleware has checked it's set
@@ -253,21 +257,30 @@ async function listProfiles(req, res) {
       };
     }
 
+    // Which page? (defaults to page 1 of 10; pageSize is capped so nobody can ask for everything at once)
+    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
+    const total = await prisma.extraProfile.count({ where }); // how many match, across all pages
+    const lastPage = Math.max(1, Math.ceil(total / pageSize));
+    // Asking for a page past the end (e.g. after a filter shrank the list) gives the last page
+    const page = Math.min(Math.max(parseInt(req.query.page, 10) || 1, 1), lastPage);
+
     const profiles = await prisma.extraProfile.findMany({
       where,
-      orderBy: [{ user: { name: 'asc' } }, { id: 'asc' }],
+      orderBy: [{ user: { name: 'asc' } }, { id: 'asc' }], // A–Z, with id as a tiebreaker so pages never overlap
+      skip: (page - 1) * pageSize, // skip the earlier pages...
+      take: pageSize,              // ...and take just this one
       include: { user: { select: { name: true } } },
     });
 
     // Only the summary fields the list needs (no bank details)
-    const result = profiles.map((p) => ({
+    const extras = profiles.map((p) => ({
       id: p.id,
       name: p.user.name,
       skills: p.skills,
       availability: p.availability,
     }));
 
-    return res.json(result);
+    return res.json({ extras, total, page, pageSize });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Something went wrong loading extras' });
