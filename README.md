@@ -32,7 +32,8 @@ push notifications, live status dashboard, edge case handling, seed data).
 🔄 Phase 3 in progress — Parts 1–11 complete (multi-production support; meeting points, wrap time + Google Maps;
 date of birth; smartphone + encrypted bank details; realistic seed data with generated photos; name search;
 production join requests with coordinator approval; notification badges; attendance + payroll export to Excel;
-email + forgot/change password; email invites + sign-up links for extras without a smartphone).
+email + forgot/change password; email invites + sign-up links for extras without a smartphone);
+code reorganisation + server-side pagination). Part 13 (screenshots) to go.
 
 ## Screenshots
 
@@ -195,6 +196,25 @@ email + forgot/change password; email invites + sign-up links for extras without
 - Web pages styled like the app (dusk gradient, glass cards, gold buttons, dropdown multi-selects)
 - Also: "Email" tags on the responses lists, pull-to-refresh on Invite Extras and the responses lists
 
+- **Part 12 – Code reorganisation ✅**
+- **API layer:** every server call moved out of the screens into `src/api/`, one file per area, sharing one
+  `apiRequest` helper (adds the login token, handles errors, and logs the user out if their password was changed elsewhere)
+- **Theme + shared components:** colours, spacing and text styles in one `theme.ts`, plus reusable components
+  (screen background, glass card, gold/ghost buttons, text field, pager, activity card, detail row, "Saved!" popup);
+  every screen switched over and the old style file removed
+- **Custom hooks:** `App.tsx` went from 1,343 to about 690 lines by moving each area's state into its own hook
+  (`useNavigation`, `useAuth`, `useBadges`, `useMyProfile`, `useMyInvites`, `useShootDays`, `useExtras`, `useRequests`);
+  screens sorted into `auth`, `extra` and `coordinator` folders
+- **Backend tidy:** the production check is now one `requireProduction` middleware instead of a copy in 10 controllers;
+  the call request reply only sends what the screens need; `npm audit` fixes; web page CSS moved into `public/styles.css`
+- **One list of options:** skills, languages and availability live only on the backend; the app loads them from
+  `GET /profile-options`, so the app and the web sign-up pages always match
+- **Server-side pagination:** the Extra Profiles list asks for one page at a time (`page` + `pageSize`) and gets the total
+  back, instead of downloading every extra
+- **UI fixes:** menu button no longer overlaps screen content, login card stays on screen on short phones and above the
+  keyboard, Forgot Password shows which email the code went to, and each email has a hidden unique line so Gmail
+  doesn't fold repeat emails behind "•••"
+
 ## Getting started
 
 1. Install dependencies:
@@ -275,7 +295,8 @@ All admin routes are scoped to the coordinator's own production.
 | GET    | `/profiles/me`         | Extra | View your own profile                     |
 | PATCH  | `/profiles/me`         | Extra | Update your own profile (date of birth, photos, skills, bank details + account holder name, etc.) |
 | PATCH  | `/profiles/me/productions` | Extra | Set the productions you want: new ones become join requests, unticked ones are left/cancelled (must keep one approved; blocked if booked on an upcoming shoot) |
-| GET    | `/profiles`            | Admin | List extras on your production, sorted A–Z (search by `name`; filter by skill, gender, availability, age) |
+| GET    | `/profiles`            | Admin | One page of extras on your production, sorted A–Z (`page`, `pageSize`; search by `name`; filter by skill, gender, availability, age). Replies with the extras plus the total |
+| GET    | `/profile-options`     | Any   | The skills, languages and availability choices (one list, shared by the app and the web pages) |
 | GET    | `/profiles/:id`        | Admin | View an extra's full profile (your production only) |
 | GET    | `/profiles/:id/bank-details` | Admin | Reveal an extra's full IBAN/BIC + account holder name (decrypted on request, access logged) |
 | DELETE | `/profiles/:id/production` | Admin | Remove an extra from your production; their upcoming invites for it become expired |
@@ -420,7 +441,13 @@ See `prisma/schema.prisma` for the full schema.
 - [x] Part 11 — Email invites + notifications for extras without a smartphone, sign-up invite links, update-details pages
   - [x] Functionality
   - [x] UI polish
-- [ ] Part 12 — Code reorganisation (hooks/navigation, API layer, shared theme + components)
+- [x] Part 12 — Code reorganisation + cleanup
+  - [x] API layer
+  - [x] Shared theme + components
+  - [x] Custom hooks + screen folders
+  - [x] Backend tidy (middleware, npm audit, one list of profile options, CSS file)
+  - [x] UI fixes
+  - [x] Server-side pagination
 - [ ] Part 13 — Screenshots of all screens and workflows
 
 ## License
