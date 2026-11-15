@@ -9,16 +9,6 @@ const TIME_ZONE = 'Europe/Dublin'; // show times as they were on set, whatever t
 const HOUR = 60 * 60 * 1000;
 const RED = 'FFDC2626';
 
-// Every coordinator must be linked to a production. Returns the
-// productionId, or sends a 403 and returns null if they aren't linked.
-function requireProduction(req, res) {
-  if (!req.user.productionId) {
-    res.status(403).json({ error: 'Your account is not linked to a production' });
-    return null;
-  }
-  return req.user.productionId;
-}
-
 // ----- Date/time formatting (Irish time) -----
 function formatDate(date) {
   // "18/09/2026"
@@ -160,8 +150,7 @@ function buildPayrollWorkbook(info, workers) {
 // on THEIR production that has already started. Every export is logged (it contains bank details).
 async function exportPayroll(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const shootDay = await prisma.shootDay.findFirst({
       where: { id: req.params.id, productionId },

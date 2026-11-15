@@ -51,4 +51,14 @@ function requireRole(...allowedRoles) {
   };
 }
 
-module.exports = { requireAuth, requireRole };
+// For coordinator routes: every coordinator must be linked to a production,
+// because everything they see is scoped to it. Use after requireRole('ADMIN').
+// The controller can then read req.user.productionId knowing it's set.
+function requireProduction(req, res, next) {
+  if (!req.user || !req.user.productionId) {
+    return res.status(403).json({ error: 'Your account is not linked to a production' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireRole, requireProduction };

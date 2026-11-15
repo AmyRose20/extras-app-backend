@@ -10,16 +10,6 @@ const INVITE_DAYS = 7; // links work for 7 days
 const DAY_MS = 24 * 60 * 60 * 1000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // something@something.something
 
-// Every coordinator must be linked to a production. Returns the
-// productionId, or sends a 403 and returns null if they aren't linked.
-function requireProduction(req, res) {
-  if (!req.user.productionId) {
-    res.status(403).json({ error: 'Your account is not linked to a production' });
-    return null;
-  }
-  return req.user.productionId;
-}
-
 // SENT (waiting) / SIGNED_UP / ADDED (already had an account) / EXPIRED
 function inviteStatus(invite) {
   if (invite.existingAccount) return 'ADDED';
@@ -140,8 +130,7 @@ async function addExistingAccount(req, res, { user, email, productionId, product
 // body: { "email": "someone@example.com" }
 async function sendSignupInvite(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     if (!EMAIL_PATTERN.test(email)) {
@@ -196,8 +185,7 @@ async function sendSignupInvite(req, res) {
 // GET /signup-invites — an ADMIN lists the invites sent for THEIR production (newest first)
 async function listSignupInvites(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const invites = await prisma.signupInvite.findMany({
       where: { productionId },

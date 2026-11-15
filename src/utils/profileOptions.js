@@ -1,5 +1,7 @@
-// The same choices as the mobile app's src/constants.ts, for the web sign-up form (Phase 3 Part 11).
-// Keep the two in sync: call request matching uses these exact names.
+// The one list of choices for skills, languages, availability and gender.
+// Used by the web sign-up / update-details pages, and sent to the mobile app by
+// GET /profile-options. Call request matching uses these exact names, so renaming one
+// means existing extras' saved choices won't match the new name.
 
 const SKILL_GROUPS = [
   { title: 'Stunts & action', options: ['Stunt work', 'Martial arts', 'Boxing', 'Firearms (licensed)', 'Archery'] },

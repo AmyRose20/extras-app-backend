@@ -9,16 +9,6 @@ const { normaliseIban, isValidIban, normaliseBic, isValidBic, maskIban } = requi
 const REQUEST_AGAIN_AFTER_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Every coordinator must be linked to a production. Returns the
-// productionId, or sends a 403 and returns null if they aren't linked.
-function requireProduction(req, res) {
-  if (!req.user.productionId) {
-    res.status(403).json({ error: 'Your account is not linked to a production' });
-    return null;
-  }
-  return req.user.productionId;
-}
-
 // Removes the encrypted bank fields before a profile is sent anywhere,
 // and adds a safe summary instead.
 //   showMasked = true  → the extra's own view: masked IBAN + BIC
@@ -226,8 +216,7 @@ async function updateFcmToken(req, res) {
 // GET /profiles — an ADMIN listing extras on THEIR production (with optional filters)
 async function listProfiles(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { skill, gender, minAge, maxAge, availability, name } = req.query;
 
@@ -290,8 +279,7 @@ async function listProfiles(req, res) {
 // Bank details are NOT included — only whether they exist (see getBankDetails).
 async function getProfileById(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { id } = req.params;
 
@@ -325,8 +313,7 @@ async function getProfileById(req, res) {
 // The ONLY place full bank details ever leave the server. Each access is logged.
 async function getBankDetails(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { id } = req.params;
 
@@ -484,8 +471,7 @@ async function updateMyProductions(req, res) {
 // Their pending + accepted invites on upcoming shoot days for this production become EXPIRED.
 async function removeExtraFromMyProduction(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { id } = req.params;
 

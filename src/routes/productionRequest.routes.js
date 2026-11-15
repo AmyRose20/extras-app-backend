@@ -1,5 +1,5 @@
 const express = require('express');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, requireRole, requireProduction } = require('../middleware/auth');
 const {
   listProductionRequests,
   approveProductionRequest,
@@ -9,8 +9,8 @@ const {
 const router = express.Router();
 
 // All coordinator-only, scoped to their own production
-router.get('/', requireAuth, requireRole('ADMIN'), listProductionRequests);
-router.patch('/:id/approve', requireAuth, requireRole('ADMIN'), approveProductionRequest);
-router.patch('/:id/deny', requireAuth, requireRole('ADMIN'), denyProductionRequest);
+router.get('/', requireAuth, requireRole('ADMIN'), requireProduction, listProductionRequests);
+router.patch('/:id/approve', requireAuth, requireRole('ADMIN'), requireProduction, approveProductionRequest);
+router.patch('/:id/deny', requireAuth, requireRole('ADMIN'), requireProduction, denyProductionRequest);
 
 module.exports = router;

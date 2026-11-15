@@ -7,21 +7,10 @@ const prisma = require('../config/db');
 const HOUR = 60 * 60 * 1000;
 const MAX_SHIFT_HOURS = 24;
 
-// Every coordinator must be linked to a production. Returns the
-// productionId, or sends a 403 and returns null if they aren't linked.
-function requireProduction(req, res) {
-  if (!req.user.productionId) {
-    res.status(403).json({ error: 'Your account is not linked to a production' });
-    return null;
-  }
-  return req.user.productionId;
-}
-
 // Finds a shoot day on MY production that has already started (call time has passed).
 // Sends an error and returns null if not.
 async function findStartedShootDay(req, res) {
-  const productionId = requireProduction(req, res);
-  if (!productionId) return null;
+  const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
   const shootDay = await prisma.shootDay.findFirst({
     where: { id: req.params.id, productionId },

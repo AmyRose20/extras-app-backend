@@ -6,22 +6,11 @@ const { ageFromDob } = require('../utils/age');
 // A "request" is an ExtraProduction (membership) row with status PENDING.
 // Extras create/cancel requests via PATCH /profiles/me/productions.
 
-// Every coordinator must be linked to a production. Returns the
-// productionId, or sends a 403 and returns null if they aren't linked.
-function requireProduction(req, res) {
-  if (!req.user.productionId) {
-    res.status(403).json({ error: 'Your account is not linked to a production' });
-    return null;
-  }
-  return req.user.productionId;
-}
-
 // GET /production-requests — an ADMIN lists PENDING requests to join their production.
 // Includes enough of each extra's profile to decide (no bank details), oldest first.
 async function listProductionRequests(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const requests = await prisma.extraProduction.findMany({
       where: {
@@ -71,8 +60,7 @@ async function listProductionRequests(req, res) {
 // Shared by approve + deny: only PENDING requests for MY production can be reviewed.
 async function reviewRequest(req, res, newStatus) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { id } = req.params;
 

@@ -3,16 +3,6 @@ const { notifyExtras, EXTRA_WITH_USER, newLinkToken } = require('../utils/notify
 const { buildInviteEmail } = require('../utils/inviteEmails');
 const { dobFilterForAgeRange } = require('../utils/age');
 
-// Every coordinator must be linked to a production. Returns the
-// productionId, or sends a 403 and returns null if they aren't linked.
-function requireProduction(req, res) {
-  if (!req.user.productionId) {
-    res.status(403).json({ error: 'Your account is not linked to a production' });
-    return null;
-  }
-  return req.user.productionId;
-}
-
 // POST /call-requests — ADMIN creates a call for one of THEIR production's
 // shoot days, and matching extras (on that production) are invited automatically.
 //
@@ -25,8 +15,7 @@ function requireProduction(req, res) {
 // }
 async function createCallRequest(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { shootDayId, description, quantityNeeded, criteria } = req.body;
 
@@ -123,8 +112,7 @@ async function findMatchingExtras(criteria, productionId) {
 // Only works for call requests on this coordinator's production.
 async function getCallRequestStatus(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { id } = req.params;
 
@@ -171,8 +159,7 @@ async function getCallRequestStatus(req, res) {
 // body: { "description": "...", "quantityNeeded": 15 }  (either or both)
 async function updateCallRequest(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { id } = req.params;
     const { description, quantityNeeded } = req.body;
@@ -217,8 +204,7 @@ async function updateCallRequest(req, res) {
 // Only upcoming shoot days in the coordinator's own production are allowed.
 async function copyCallRequest(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { id } = req.params;
     const { shootDayIds } = req.body;

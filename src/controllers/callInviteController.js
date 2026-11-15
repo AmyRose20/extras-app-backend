@@ -15,16 +15,6 @@ const VALID_TRANSITIONS = {
   ACCEPTED: ['CANCELLED'],
 };
 
-// Every coordinator must be linked to a production. Returns the
-// productionId, or sends a 403 and returns null if they aren't linked.
-function requireProduction(req, res) {
-  if (!req.user.productionId) {
-    res.status(403).json({ error: 'Your account is not linked to a production' });
-    return null;
-  }
-  return req.user.productionId;
-}
-
 // GET /invites/me — an EXTRA sees their own pending/past invites
 async function getMyInvites(req, res) {
   const profile = await prisma.extraProfile.findUnique({
@@ -172,8 +162,7 @@ async function getMyTally(req, res) {
 // of an extra on THEIR production
 async function getExtraTally(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { extraProfileId } = req.params;
 

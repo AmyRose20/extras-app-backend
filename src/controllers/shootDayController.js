@@ -31,16 +31,6 @@ function formatTimeForMessage(date) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-// Every coordinator must be linked to a production. Returns the
-// productionId, or sends a 403 and returns null if they aren't linked.
-function requireProduction(req, res) {
-  if (!req.user.productionId) {
-    res.status(403).json({ error: 'Your account is not linked to a production' });
-    return null;
-  }
-  return req.user.productionId;
-}
-
 // Checks an estimated wrap time against the call time.
 // wrapInput: undefined = not provided, null/'' = clear it, otherwise a date string.
 // The app works out overnight wraps (e.g. 18:00 call, 04:00 wrap -> next day)
@@ -87,8 +77,7 @@ function checkPin(latitude, longitude) {
 //         "estimatedWrapAt": "..." (optional) }
 async function createShootDay(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { date, location, locationAddress, estimatedWrapAt, latitude, longitude } = req.body;
 
@@ -129,8 +118,7 @@ async function createShootDay(req, res) {
 // GET /shoot-days — ADMIN sees every shoot day for THEIR production, most recent first
 async function getShootDays(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const shootDays = await prisma.shootDay.findMany({
       where: { productionId },
@@ -154,8 +142,7 @@ async function getShootDays(req, res) {
 // Only works for shoot days in their own production.
 async function getShootDay(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { id } = req.params;
 
@@ -186,8 +173,7 @@ async function getShootDay(req, res) {
 // invite are notified of whatever actually changed.
 async function updateShootDay(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { id } = req.params;
     const { date, estimatedWrapAt, location, locationAddress, latitude, longitude } = req.body;
@@ -374,8 +360,7 @@ async function sendShootDayUpdateNotifications(shootDay, changes) {
 // }
 async function createShootDaysBulk(req, res) {
   try {
-    const productionId = requireProduction(req, res);
-    if (!productionId) return;
+    const { productionId } = req.user; // the requireProduction middleware has checked it's set
 
     const { shootDays } = req.body;
 
