@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 // Sends emails through Brevo's SMTP server, using the SMTP_* and EMAIL_FROM_* values in .env.
 // Used for password reset codes, and invites/updates for extras without a smartphone (Part 11).
@@ -37,10 +38,18 @@ function escapeHtml(text) {
 // Wraps an email's content in a simple, consistent layout.
 // bodyHtml is already-safe HTML (escape any user text with escapeHtml first).
 // <!--DETAILS_LINK--> is an invisible marker: sendEmail puts the "update your details" link there when asked.
+//
+// Gmail groups emails with the same subject into one conversation, and hides any part that
+// looks the same as an earlier email behind a "•••" button. So each email gets a hidden,
+// unique line at the very top and bottom: no two emails look the same, and nothing is folded away.
+// The top line also starts with the title, which is what the inbox shows as the preview.
 function emailLayout(title, bodyHtml) {
+  const uniqueId = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  const hidden = 'display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:transparent;';
   return `<!doctype html>
 <html>
   <body style="margin:0;padding:24px;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <div style="${hidden}">${escapeHtml(title)} · ref ${uniqueId}</div>
     <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;">
       <div style="background:#241d3d;padding:18px 24px;color:#d99c4a;font-weight:bold;font-size:18px;">Extras App</div>
       <div style="padding:24px;">
@@ -50,7 +59,7 @@ function emailLayout(title, bodyHtml) {
       </div>
       <div style="padding:14px 24px;background:#f9fafb;color:#6b7280;font-size:12px;">
         This is an automated email from the Extras App. Please don't reply to it.
-        <span style="display:none;font-size:0;color:transparent;">${Date.now()}</span>
+        <span style="${hidden}">ref ${uniqueId}</span>
       </div>
     </div>
   </body>
