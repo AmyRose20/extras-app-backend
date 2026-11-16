@@ -33,21 +33,143 @@ push notifications, live status dashboard, edge case handling, seed data).
 date of birth; smartphone + encrypted bank details; realistic seed data with generated photos; name search;
 production join requests with coordinator approval; notification badges; attendance + payroll export to Excel;
 email + forgot/change password; email invites + sign-up links for extras without a smartphone);
-code reorganisation + server-side pagination). Part 13 (screenshots) to go.
+code reorganisation + server-side pagination; screenshots of every screen). Part 14 (video demos) to go.
 
 ## Screenshots
 
-| Login | Home (Extra) | Home (Admin) |
+| Login | Home (Extra) | Home (Coordinator) |
 |---|---|---|
-| ![Login Screen](screenshots/Login%20Screen.png) | ![Home Screen - Extra](screenshots/Home%20Screen%20-%20extra.png) | ![Home Screen - Admin](screenshots/Home%20Screen%20-%20admin.png) |
+| <img src="screenshots/auth-01-login.png" width="250"> | <img src="screenshots/extra-01-home.png" width="250"> | <img src="screenshots/coord-01-home.png" width="250"> |
 
-| My Invites | Create Call Request (matched) | Create Call Request (no matches) |
+<details>
+<summary><strong>Extra: invites and push notifications</strong></summary>
+
+| My Invites | Invite history (accepted, no-show) | Push notification |
 |---|---|---|
-| ![My Invites](screenshots/My%20Invites.png) | ![Matches and tally](screenshots/Create%20call%20request%20-%20matches%20and%20tally%20screen.png) | ![No matches](screenshots/Create%20call%20request%20-%20no%20matches.png) |
+| <img src="screenshots/extra-02-invites.png" width="250"> | <img src="screenshots/extra-03-invites-history.png" width="250"> | <img src="screenshots/extra-07-push-notification.png" width="250"> |
 
-| Push Notification |
-|---|
-| ![Push notification](screenshots/call%20request%20notification%20-%20extra.png) |
+</details>
+
+<details>
+<summary><strong>Extra: profile</strong></summary>
+
+| My Profile | Photos, contact + masked bank details | Edit profile | Edit profile (bottom) |
+|---|---|---|---|
+| <img src="screenshots/extra-04-profile.png" width="250"> | <img src="screenshots/extra-05-profile-bottom-edit-button.png" width="250"> | <img src="screenshots/extra-06-profile-edit.png" width="250"> | <img src="screenshots/extra-06b-profile-edit-bottom.png" width="250"> |
+
+</details>
+
+<details>
+<summary><strong>Extra: menu and account deletion</strong></summary>
+
+| Menu | Delete account (asks the coordinator) | Deletion requested |
+|---|---|---|
+| <img src="screenshots/extra-08-menu.png" width="250"> | <img src="screenshots/extra-09-delete-confirm.png" width="250"> | <img src="screenshots/extra-10-deletion-requested.png" width="250"> |
+
+</details>
+
+<details>
+<summary><strong>Sign in and passwords</strong></summary>
+
+| Forgot password | Change password |
+|---|---|
+| <img src="screenshots/auth-02-forgot-password.png" width="250"> | <img src="screenshots/auth-03-change-password.png" width="250"> |
+
+</details>
+
+<details>
+<summary><strong>Coordinator: menu, badges and requests</strong></summary>
+
+| Menu with badge | Production join requests | Deletion request badge | Deletion requests |
+|---|---|---|---|
+| <img src="screenshots/coord-02-menu.png" width="250"> | <img src="screenshots/coord-03-production-requests.png" width="250"> | <img src="screenshots/coord-24-menu-deletion-badge.png" width="250"> | <img src="screenshots/coord-25-deletion-requests.png" width="250"> |
+
+</details>
+
+<details>
+<summary><strong>Coordinator: scheduling shoot days</strong></summary>
+
+| Shoot days | Shoot day detail | Add shoot days |
+|---|---|---|
+| <img src="screenshots/coord-04-shoot-days.png" width="250"> | <img src="screenshots/coord-05-shoot-day-detail.png" width="250"> | <img src="screenshots/coord-08-add-shoot-days.png" width="250"> |
+
+| Meeting point on a map | Several days in one go |
+|---|---|
+| <img src="screenshots/coord-09-map-picker.png" width="250"> | <img src="screenshots/coord-10-add-shoot-days-batch.png" width="250"> |
+
+</details>
+
+<details>
+<summary><strong>Coordinator: casting (call requests)</strong></summary>
+
+| Create call request | Matched extras | No matches (nothing created) |
+|---|---|---|
+| <img src="screenshots/coord-11-create-call-request.png" width="250"> | <img src="screenshots/coord-12-call-request-matched.png" width="250"> | <img src="screenshots/coord-13-call-request-no-matches.png" width="250"> |
+
+| Copy to other shoot days | Live responses | Who accepted | Extra without a smartphone (email) |
+|---|---|---|---|
+| <img src="screenshots/coord-14-copy-call-request.png" width="250"> | <img src="screenshots/coord-06-responses.png" width="250"> | <img src="screenshots/coord-07-invite-list.png" width="250"> | <img src="screenshots/coord-26-accepted-email-extra.png" width="250"> |
+
+</details>
+
+<details>
+<summary><strong>Coordinator: attendance and payroll</strong></summary>
+
+| Attendance (no-shows, finish times) | Bank details warning | Share the Excel file |
+|---|---|---|
+| <img src="screenshots/coord-15-attendance.png" width="250"> | <img src="screenshots/coord-16-export-confirm.png" width="250"> | <img src="screenshots/coord-17-payroll-share.png" width="250"> |
+
+**The payroll file in Excel**
+
+<img src="screenshots/payroll-excel.png" width="760">
+
+</details>
+
+<details>
+<summary><strong>Coordinator: extras</strong></summary>
+
+| Extras list | Server-side pages | Name search |
+|---|---|---|
+| <img src="screenshots/coord-18-extras-list.png" width="250"> | <img src="screenshots/coord-18b-extras-list-pages.png" width="250"> | <img src="screenshots/coord-19-extras-search.png" width="250"> |
+
+| Extra profile | Activity + 3-strikes warning | Invite extras by email |
+|---|---|---|
+| <img src="screenshots/coord-20-extra-profile.png" width="250"> | <img src="screenshots/coord-21-extra-activity.png" width="250"> | <img src="screenshots/coord-23-invite-extras.png" width="250"> |
+
+Bank details stay hidden until the coordinator taps **Show bank details**:
+
+| Hidden | Revealed |
+|---|---|
+| <img src="screenshots/coord-22-extra-bank-hidden.png" width="250"> | <img src="screenshots/coord-22b-extra-bank-revealed.png" width="250"> |
+
+</details>
+
+<details>
+<summary><strong>Extras without a smartphone: emails and web pages</strong></summary>
+
+**Signing up from a coordinator's invite**
+
+| Invite email | Sign-up page | Has a smartphone: password |
+|---|---|---|
+| <img src="screenshots/email-01-signup-invite.png" width="250"> | <img src="screenshots/web-01-signup.png" width="250"> | <img src="screenshots/web-02-signup-smartphone.png" width="250"> |
+
+| No smartphone: details | Details (middle) | Details (bottom) | Signed up |
+|---|---|---|---|
+| <img src="screenshots/web-03-signup-details.png" width="250"> | <img src="screenshots/web-03b-signup-details-middle.png" width="250"> | <img src="screenshots/web-03c-signup-details-bottom.png" width="250"> | <img src="screenshots/web-04-signup-done.png" width="250"> |
+
+**Answering a call by email**
+
+| Call invite email | Confirm page | Accepted | "You're booked" email |
+|---|---|---|---|
+| <img src="screenshots/email-02-call-invite.png" width="250"> | <img src="screenshots/web-05-invite-confirm.png" width="250"> | <img src="screenshots/web-06-invite-accepted.png" width="250"> | <img src="screenshots/email-03-booked.png" width="250"> |
+
+**Updating details by email link**
+
+| Ask for a link | Link sent | Link email | Update details | Update details (bottom) |
+|---|---|---|---|---|
+| <img src="screenshots/web-07-details-request.png" width="250"> | <img src="screenshots/web-07b-details-link-sent.png" width="250"> | <img src="screenshots/email-04-details-link.png" width="250"> | <img src="screenshots/web-08-details-update.png" width="250"> | <img src="screenshots/web-08b-details-update-bottom.png" width="250"> |
+
+</details>
 
 **Phase 2 details** — UI/UX polish + new features, tackled part-by-part.
 
@@ -448,7 +570,8 @@ See `prisma/schema.prisma` for the full schema.
   - [x] Backend tidy (middleware, npm audit, one list of profile options, CSS file)
   - [x] UI fixes
   - [x] Server-side pagination
-- [ ] Part 13 — Screenshots of all screens and workflows
+- [x] Part 13 — Screenshots of all screens and workflows
+- [ ] Part 14 — Short video demos of the main workflows
 
 ## License
 
