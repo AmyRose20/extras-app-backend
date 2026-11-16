@@ -5,6 +5,7 @@ const { dobFilterForAgeRange } = require('../utils/age');
 
 // POST /call-requests — ADMIN creates a call for one of THEIR production's
 // shoot days, and matching extras (on that production) are invited automatically.
+// If nobody matches, nothing is created and a warning is sent back instead.
 //
 // Expected body:
 // {
@@ -33,28 +34,36 @@ async function createCallRequest(req, res) {
       return res.status(404).json({ error: 'Shoot day not found' });
     }
 
+    // Find who matches FIRST, so a call request is only saved if someone can be invited.
+    // (Criteria can't be edited later, so an empty call request would just be clutter.)
+    const matchedExtras = await findMatchingExtras(criteria, productionId);
+
+    if (matchedExtras.length === 0) {
+      // Nothing is saved — the coordinator can widen the criteria and try again
+      return res.status(200).json({
+        callRequest: null,
+        matchedCount: 0,
+        warning: 'No extras matched these criteria, so nothing was created. Try widening the age range, gender or skills.',
+      });
+    }
+
     const callRequest = await prisma.callRequest.create({
       data: { shootDayId, description, quantityNeeded, criteria },
     });
 
-    const matchedExtras = await findMatchingExtras(criteria, productionId);
-
-    if (matchedExtras.length > 0) {
-      await prisma.callInvite.createMany({
-        data: matchedExtras.map((extra) => ({
-          callRequestId: callRequest.id,
-          extraProfileId: extra.id,
-        })),
-        skipDuplicates: true,
-      });
+    await prisma.callInvite.createMany({
+      data: matchedExtras.map((extra) => ({
+        callRequestId: callRequest.id,
+        extraProfileId: extra.id,
+      })),
+      skipDuplicates: true,
+    });
 
     await notifyMatchedExtras(matchedExtras, callRequest);
-    }
 
     return res.status(201).json({
       callRequest,
       matchedCount: matchedExtras.length,
-      warning: matchedExtras.length === 0 ? 'No extras matched this criteria — try widening the age range, gender, or skills.' : undefined,
     });
   } catch (err) {
     console.error(err);
