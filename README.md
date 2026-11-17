@@ -1,10 +1,25 @@
 # Extras App — API
 
-Film productions often fill background roles ("20 men, 25-45, for a fight
-scene") by manually phoning through a list of 100+ extras one by one. This
-project replaces that with a system where extras have a profile, coordinators
-create a call with criteria, matching extras are found automatically and
-notified, and they can accept or decline right from the app.
+# Extras App — API
+
+Background roles in film and TV ("20 men, aged 25–45, for a fight scene") are
+still organised by hand in some productions. Two jobs take up most of a crowd coordinator's time:
+
+- **Finding extras.** The coordinator phones through a list of 100+ extras, one
+  call at a time, until enough people have said yes to fill the day’s numbers.
+- **Paperwork.** On every shoot day, each extra fills in a paper form with their
+  name, date of birth, contact details and bank details (IBAN and BIC). The
+  coordinator ends the day with up to 100 sheets of paper holding everyone's
+  personal and payment details, and has to work out from them who turned up
+  and who needs to be paid.
+
+The Extras App replaces both. Extras enter their details in a profile once.
+Coordinators create a call request with criteria such as age, gender and skills. 
+Matching extras are found automatically and notified (by push notification or by 
+email for extras without a smartphone), so they can accept or decline in a tap. 
+On the day, the coordinator marks who turned up and when they finished, then exports 
+a payroll spreadsheet straight from their phone. Bank details are stored encrypted, 
+and coordinators only see them when they choose to reveal them.
 
 Built after being laid off as a software engineer — a portfolio project
 based on firsthand experience working as a film extra.
@@ -29,11 +44,39 @@ push notifications, live status dashboard, edge case handling, seed data).
 
 ✅ Phase 2 complete — UI/UX polish pass across the whole app, tackled part-by-part.
 
-🔄 Phase 3 in progress — Parts 1–11 complete (multi-production support; meeting points, wrap time + Google Maps;
-date of birth; smartphone + encrypted bank details; realistic seed data with generated photos; name search;
-production join requests with coordinator approval; notification badges; attendance + payroll export to Excel;
-email + forgot/change password; email invites + sign-up links for extras without a smartphone);
-code reorganisation + server-side pagination; screenshots of every screen). Part 14 (video demos) to go.
+✅ Phase 3 complete — multi-production support; meeting points, wrap time + Google Maps;
+date of birth; smartphone + encrypted bank details; realistic seed data with generated photos;
+name search; production join requests with coordinator approval; notification badges;
+attendance + payroll export to Excel; email + forgot/change password; email invites + sign-up
+links for extras without a smartphone; code reorganisation + server-side pagination;
+screenshots and video demos of the main workflows.
+
+## Video demos
+
+**1. Calling extras:** the coordinator creates a call, the extra gets a push notification
+and accepts it, and the coordinator refreshes to see the acceptance.
+
+https://github.com/user-attachments/assets/2b4b923c-519b-4d79-a322-6eee8f4716a6
+
+**2. Extras without a smartphone:** the call arrives by email, the extra accepts on a web
+page, and the coordinator sees them as accepted (tagged "Email").
+
+https://github.com/user-attachments/assets/2e422ae1-f4ce-4712-9741-57f5b9130957
+
+**3. Scheduling shoot days:** two days added in one go, one at the studio and one at a
+new location picked on the map.
+
+https://github.com/user-attachments/assets/320f7ff3-1db7-4896-b887-4e8496330522
+
+**4. Attendance and payroll:** marking a no-show, changing a finish time, and exporting
+the payroll spreadsheet from the phone.
+
+https://github.com/user-attachments/assets/c83b4735-6594-40d5-8f5e-c0e03e2e968b
+
+**5. Joining a production:** an extra asks to join a second production, and the
+coordinator approves the request.
+
+https://github.com/user-attachments/assets/37e0033c-630f-40b0-8d28-c34a86c1a4d5
 
 ## Screenshots
 
@@ -571,7 +614,11 @@ See `prisma/schema.prisma` for the full schema.
   - [x] UI fixes
   - [x] Server-side pagination
 - [x] Part 13 — Screenshots of all screens and workflows
-- [ ] Part 14 — Short video demos of the main workflows
+  - [x] Bug fixed: a call request with no matching extras was still saved (now nothing is created)
+  - [x] Removed a leftover placeholder icon on the profile screen
+- [x] Part 14 — Short video demos of the main workflows
+  - [x] Bug fixed: tapping a push notification opened the app on Home instead of My Invites
+  - [x] Bug fixed: pressing Accept twice on an email invite showed an error instead of "You're booked!"
 
 ## License
 
