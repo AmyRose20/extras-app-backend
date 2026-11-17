@@ -138,6 +138,13 @@ async function answerInvite(req, res) {
     const newStatus = ANSWERS[req.body.answer];
     const actions = allowedActions(invite);
 
+    // Same answer as they already gave (e.g. a double click, or pressing the button again):
+    // show the same "done" page as the first time, not an error
+    if (newStatus && invite.status === newStatus) {
+      const [heading, message] = DONE[newStatus];
+      return renderInvitePage(res, 200, invite, token, heading, message, []);
+    }
+
     if (!newStatus || !actions.includes(newStatus)) {
       return renderInvitePage(res, 400, invite, token, "That can't be changed now", STATUS_TEXT[invite.status], actions);
     }
@@ -149,6 +156,11 @@ async function answerInvite(req, res) {
     });
     if (result.count === 0) {
       const latest = await findInviteByToken(token);
+      if (latest.status === newStatus) {
+        // Two clicks arrived at the same moment and the other one saved it: same "done" page
+        const [heading, message] = DONE[newStatus];
+        return renderInvitePage(res, 200, latest, token, heading, message, []);
+      }
       return renderInvitePage(res, 409, latest, token, 'Already answered', STATUS_TEXT[latest.status], allowedActions(latest));
     }
     invite.status = newStatus;
