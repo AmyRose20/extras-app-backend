@@ -1,7 +1,5 @@
 # Extras App — API
 
-# Extras App — API
-
 Background roles in film and TV ("20 men, aged 25–45, for a fight scene") are
 still organised by hand in some productions. Two jobs take up most of a crowd coordinator's time:
 
